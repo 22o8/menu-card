@@ -6,8 +6,8 @@
 
     <div class="viewer-shell" :class="{ 'viewer-shell-mobile': isMobile }">
       <button
+        v-if="!isMobile"
         class="nav-arrow nav-arrow-left"
-        :class="{ 'nav-arrow-mobile': isMobile }"
         type="button"
         :disabled="!ready || atStart"
         aria-label="Previous page"
@@ -45,8 +45,8 @@
         <div class="book-frame" :class="{ 'book-frame-mobile': isMobile, 'book-frame-tablet': isTablet && !isMobile }">
           <div class="frame-glow"></div>
           <div class="frame-outline"></div>
-          <div class="touch-hint" v-if="isMobile">
-            {{ locale === 'ar' ? 'اسحب الصفحة أو استخدم الأسهم' : 'Swipe pages or use arrows' }}
+          <div v-if="isMobile" class="touch-hint">
+            {{ locale === 'ar' ? 'اسحب الصفحة أو استخدم الأسهم' : 'Swipe the page or use the arrows' }}
           </div>
 
           <div ref="bookRef" class="flip-book" :class="{ 'flip-book-mobile': isMobile }">
@@ -150,8 +150,8 @@
       </div>
 
       <button
+        v-if="!isMobile"
         class="nav-arrow nav-arrow-right"
-        :class="{ 'nav-arrow-mobile': isMobile }"
         type="button"
         :disabled="!ready || atEnd"
         aria-label="Next page"
@@ -169,7 +169,6 @@ import type { PageFlip as PageFlipInstance } from 'page-flip'
 import { menuSpreads } from '~/data/menu'
 
 type Locale = 'ar' | 'en'
-
 type MenuBadge = 'chef' | 'spicy' | 'new'
 
 type PageModel = {
@@ -194,7 +193,7 @@ let pageFlip: PageFlipInstance | null = null
 let resizeTimer: ReturnType<typeof setTimeout> | null = null
 
 const isMobile = computed(() => viewportWidth.value < 768)
-const isTablet = computed(() => viewportWidth.value >= 768 && viewportWidth.value < 1100)
+const isTablet = computed(() => viewportWidth.value >= 768 && viewportWidth.value < 1180)
 
 const uiMap = {
   ar: {
@@ -301,17 +300,18 @@ function updateViewport() {
 function getFlipConfig() {
   if (isMobile.value) {
     return {
-      width: 356,
-      height: 592,
-      minWidth: 280,
-      maxWidth: 430,
-      minHeight: 430,
-      maxHeight: 720,
+      width: 360,
+      height: 590,
+      minWidth: 290,
+      maxWidth: 420,
+      minHeight: 460,
+      maxHeight: 740,
       usePortrait: true,
-      swipeDistance: 14,
+      swipeDistance: 12,
       flippingTime: 620,
       mobileScrollSupport: true,
-      maxShadowOpacity: 0.28
+      maxShadowOpacity: 0.26,
+      flipCorner: 'bottom' as const
     }
   }
 
@@ -319,15 +319,16 @@ function getFlipConfig() {
     return {
       width: 430,
       height: 650,
-      minWidth: 330,
-      maxWidth: 470,
-      minHeight: 460,
-      maxHeight: 720,
+      minWidth: 340,
+      maxWidth: 480,
+      minHeight: 500,
+      maxHeight: 740,
       usePortrait: false,
-      swipeDistance: 20,
+      swipeDistance: 18,
       flippingTime: 760,
       mobileScrollSupport: true,
-      maxShadowOpacity: 0.34
+      maxShadowOpacity: 0.34,
+      flipCorner: 'top' as const
     }
   }
 
@@ -339,17 +340,19 @@ function getFlipConfig() {
     minHeight: 520,
     maxHeight: 760,
     usePortrait: false,
-    swipeDistance: 24,
+    swipeDistance: 22,
     flippingTime: 880,
     mobileScrollSupport: false,
-    maxShadowOpacity: 0.42
+    maxShadowOpacity: 0.42,
+    flipCorner: 'top' as const
   }
 }
 
 function syncState() {
   if (!pageFlip) return
   currentPage.value = pageFlip.getCurrentPageIndex?.() ?? 0
-  const rawSpread = Math.floor(currentPage.value / 2) + 1
+  const divider = isMobile.value ? 1 : 2
+  const rawSpread = Math.floor(currentPage.value / divider) + 1
   currentSpread.value = Math.min(rawSpread, totalSpreads.value)
 }
 
@@ -393,7 +396,7 @@ async function initFlipBook(targetIndex = 0) {
   const pageNodes = container.querySelectorAll<HTMLElement>('.js-page')
   pageFlip.loadFromHTML(pageNodes)
 
-  totalSpreads.value = Math.max(1, Math.ceil(pageNodes.length / 2))
+  totalSpreads.value = Math.max(1, Math.ceil(pageNodes.length / (isMobile.value ? 1 : 2)))
 
   pageFlip.on('flip', syncState)
   pageFlip.on('changeState', syncState)
@@ -410,12 +413,12 @@ async function initFlipBook(targetIndex = 0) {
 
 function nextPage() {
   if (!pageFlip) return
-  pageFlip.flipNext(isMobile.value ? 'bottom' : 'top')
+  pageFlip.flipNext(getFlipConfig().flipCorner)
 }
 
 function prevPage() {
   if (!pageFlip) return
-  pageFlip.flipPrev(isMobile.value ? 'bottom' : 'top')
+  pageFlip.flipPrev(getFlipConfig().flipCorner)
 }
 
 function applyZoom() {
@@ -522,79 +525,78 @@ onBeforeUnmount(() => {
   gap: 18px;
 }
 
+.viewer-shell-mobile {
+  grid-template-columns: 1fr;
+}
+
 .viewer-center {
   display: grid;
   place-items: center;
-  gap: 24px;
+  gap: 22px;
 }
 
 .mobile-actions-bar {
-  width: min(460px, calc(100vw - 26px));
-  display: none;
+  width: min(430px, 100%);
+  display: grid;
+  grid-template-columns: 54px 1fr 54px;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 4px;
+  gap: 12px;
 }
 
 .mobile-nav-btn {
-  width: 46px;
-  height: 46px;
+  width: 54px;
+  height: 54px;
   border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(12, 13, 18, 0.78);
-  color: #fff;
-  font-size: 28px;
-  box-shadow: 0 14px 24px rgba(0,0,0,0.24);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(10, 10, 12, 0.56);
+  color: white;
+  display: grid;
+  place-items: center;
+  font-size: 32px;
+  line-height: 1;
+  backdrop-filter: blur(10px);
 }
 
-.mobile-nav-btn:disabled { opacity: 0.32; }
+.mobile-nav-btn:disabled {
+  opacity: 0.35;
+}
 
 .mobile-indicator-wrap {
-  flex: 1;
-  min-width: 0;
-  border-radius: 999px;
-  padding: 9px 16px;
-  background: rgba(255,255,255,0.055);
-  border: 1px solid rgba(255,255,255,0.08);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+  min-height: 54px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  display: grid;
+  place-items: center;
+  padding: 6px 14px;
   text-align: center;
 }
 
 .mobile-indicator-label {
-  display: block;
+  color: rgba(255, 255, 255, 0.64);
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.58);
-  margin-bottom: 2px;
 }
 
 .mobile-indicator-value {
-  display: block;
-  color: #f5f1e8;
-  font-size: 16px;
+  color: #f7f2ea;
+  font-size: 18px;
+  margin-top: 2px;
 }
 
 .book-frame {
   position: relative;
-  width: min(1140px, 100%);
-  min-height: 720px;
+  width: min(1060px, 100%);
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 18px;
-  border-radius: 40px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-  border: 1px solid rgba(255,255,255,0.045);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+  padding: 8px 0 10px;
 }
 
 .book-frame-mobile {
-  width: min(460px, calc(100vw - 18px));
-  min-height: auto;
-  padding: 10px;
-  border-radius: 30px;
+  width: min(430px, 100%);
 }
 
 .book-frame-tablet {
@@ -603,49 +605,49 @@ onBeforeUnmount(() => {
 
 .frame-glow {
   position: absolute;
-  inset: auto 10% -38px 10%;
-  height: 86px;
+  inset: auto 8% -36px 8%;
+  height: 74px;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(0, 0, 0, 0.55), transparent 70%);
-  filter: blur(20px);
+  background: radial-gradient(circle, rgba(0, 0, 0, 0.5), transparent 70%);
+  filter: blur(18px);
   pointer-events: none;
 }
 
 .frame-outline {
   position: absolute;
-  inset: 16px;
+  inset: 0;
   border-radius: 32px;
-  border: 1px solid rgba(255,255,255,0.04);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
   pointer-events: none;
 }
 
 .touch-hint {
   position: absolute;
-  top: 14px;
+  top: 18px;
   left: 50%;
   transform: translateX(-50%);
-  padding: 8px 14px;
+  z-index: 2;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  padding: 7px 12px;
   border-radius: 999px;
-  background: rgba(9, 10, 14, 0.7);
-  border: 1px solid rgba(255,255,255,0.08);
-  color: rgba(255,255,255,0.72);
-  font-size: 12px;
-  z-index: 3;
-  backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255,255,255,0.06);
 }
 
 .flip-book {
-  width: min(1080px, 100%);
-  max-width: 1080px;
+  width: min(1040px, 100%);
+  max-width: 1040px;
   height: auto;
   transform: scale(var(--menu-book-scale, 1));
   transform-origin: center center;
   transition: transform 0.24s ease;
-  will-change: transform;
 }
 
 .flip-book-mobile {
-  width: 100%;
+  width: min(390px, 100%);
 }
 
 :deep(.stf__parent),
@@ -653,23 +655,10 @@ onBeforeUnmount(() => {
   margin-inline: auto;
 }
 
-:deep(.stf__wrapper) {
+:deep(.stf__block) {
+  box-shadow: none !important;
+  margin: 0 !important;
   touch-action: pan-y pinch-zoom;
-}
-
-:deep(.stf__wrapper)::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 2.4%;
-  transform: translateX(-50%);
-  width: 12px;
-  height: 95.2%;
-  border-radius: 999px;
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(0,0,0,0.56), rgba(216,166,70,0.1) 50%, rgba(0,0,0,0.56));
-  opacity: 0.38;
-  filter: blur(1px);
 }
 
 :deep(.stf__item) {
@@ -677,9 +666,24 @@ onBeforeUnmount(() => {
   padding: 0 !important;
 }
 
-:deep(.stf__block) {
-  box-shadow: none !important;
-  margin: 0 !important;
+:deep(.stf__wrapper)::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 2%;
+  transform: translateX(-50%);
+  width: 12px;
+  height: 96%;
+  border-radius: 999px;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(0,0,0,0.5), rgba(216,166,70,0.12) 50%, rgba(0,0,0,0.5));
+  opacity: 0.32;
+  filter: blur(1px);
+}
+
+.book-frame-mobile :deep(.stf__wrapper)::after {
+  opacity: 0.18;
+  width: 8px;
 }
 
 .page {
@@ -695,11 +699,16 @@ onBeforeUnmount(() => {
 }
 
 .page-inner-left {
-  padding: 12px 6px 12px 12px;
+  padding: 14px 6px 14px 14px;
 }
 
 .page-inner-right {
-  padding: 12px 12px 12px 6px;
+  padding: 14px 14px 14px 6px;
+}
+
+.book-frame-mobile .page-inner-left,
+.book-frame-mobile .page-inner-right {
+  padding: 18px 14px;
 }
 
 .cover-surface,
@@ -708,10 +717,10 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  border-radius: 24px;
+  border-radius: 22px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.014)),
-    linear-gradient(180deg, #28292d 0%, #17181c 100%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.012)),
+    linear-gradient(180deg, #26272b 0%, #18191d 100%);
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.05),
     0 24px 60px rgba(0, 0, 0, 0.34);
@@ -719,62 +728,75 @@ onBeforeUnmount(() => {
 
 .cover-surface-left,
 .menu-surface-left {
-  border-top-right-radius: 10px;
-  border-bottom-right-radius: 10px;
+  border-top-right-radius: 8px;
+  border-bottom-right-radius: 8px;
 }
 
 .cover-surface-right,
 .menu-surface-right {
-  border-top-left-radius: 10px;
-  border-bottom-left-radius: 10px;
+  border-top-left-radius: 8px;
+  border-bottom-left-radius: 8px;
+}
+
+.book-frame-mobile .cover-surface,
+.book-frame-mobile .menu-surface {
+  border-radius: 22px;
 }
 
 .foil-outline {
   position: absolute;
-  inset: 16px;
-  border-radius: 16px;
-  border: 1px solid rgba(199, 150, 26, 0.14);
+  inset: 18px;
+  border: 1px solid rgba(208, 164, 72, 0.16);
+  border-radius: 12px;
   pointer-events: none;
 }
 
 .cover-noise {
   position: absolute;
   inset: 0;
-  opacity: 0.06;
-  background-image: radial-gradient(circle, rgba(255,255,255,0.18) 0.5px, transparent 0.5px);
-  background-size: 8px 8px;
+  opacity: 0.08;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.18) 0.5px, transparent 0.5px);
+  background-size: 9px 9px;
 }
 
 .cover-orb {
   position: absolute;
-  width: 180px;
-  height: 180px;
   border-radius: 999px;
-  filter: blur(60px);
-  opacity: 0.18;
+  filter: blur(28px);
+  opacity: 0.35;
+  pointer-events: none;
 }
 
 .cover-orb-top {
-  top: -40px;
-  right: -12px;
-  background: rgba(199,150,26,0.34);
+  width: 140px;
+  height: 140px;
+  top: 6%;
+  right: 6%;
+  background: rgba(212, 164, 66, 0.22);
 }
 
 .cover-orb-bottom {
-  bottom: -60px;
-  left: -40px;
-  background: rgba(255,255,255,0.08);
+  width: 160px;
+  height: 160px;
+  left: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .cover-spine-mark {
   position: absolute;
-  top: 8%;
-  bottom: 8%;
-  right: 24px;
-  width: 8px;
+  inset: 18px;
+  display: grid;
+  place-items: center;
+}
+
+.cover-spine-mark::before {
+  content: '';
+  width: 110px;
+  height: 110px;
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(0,0,0,0.72), rgba(255,255,255,0.08), rgba(0,0,0,0.72));
-  opacity: 0.52;
+  border: 1px solid rgba(212, 164, 66, 0.18);
+  box-shadow: inset 0 0 0 16px rgba(212, 164, 66, 0.02);
 }
 
 .cover-content {
@@ -786,338 +808,369 @@ onBeforeUnmount(() => {
   justify-content: center;
   align-items: center;
   text-align: center;
-  padding: 52px 42px;
+  padding: 48px;
 }
 
-.cover-kicker {
+.cover-kicker,
+.menu-kicker {
+  color: #d2a34a;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  font-size: 12px;
   margin: 0 0 18px;
-  color: #d0a247;
-  font-size: 13px;
-  letter-spacing: 0.3em;
 }
 
 .cover-title {
-  margin: 0;
-  font-size: clamp(42px, 5vw, 66px);
-  line-height: 1.02;
-  color: #f6f2e9;
+  color: #f6f1e8;
+  font-size: 60px;
+  line-height: 1.04;
+  margin: 0 0 18px;
+  font-weight: 700;
 }
 
 .cover-subtitle {
-  margin: 18px 0 0;
+  color: rgba(255, 255, 255, 0.76);
   font-size: 18px;
-  line-height: 1.9;
-  color: rgba(255,255,255,0.76);
-  max-width: 400px;
+  line-height: 1.85;
+  max-width: 340px;
+  margin: 0;
 }
 
 .cover-meta {
   margin-top: 28px;
   display: flex;
+  gap: 12px;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 10px;
 }
 
 .cover-meta span {
-  padding: 8px 14px;
+  color: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 10px 16px;
   border-radius: 999px;
-  border: 1px solid rgba(199,150,26,0.18);
-  background: rgba(199,150,26,0.08);
-  color: #e7bf69;
   font-size: 13px;
 }
 
 .menu-surface {
-  padding: 28px 28px 22px;
+  padding: 34px 28px 24px;
 }
 
 .menu-flourish {
   position: absolute;
-  width: 150px;
-  height: 78px;
-  opacity: 0.11;
+  width: 120px;
+  height: 72px;
+  opacity: 0.12;
   pointer-events: none;
 }
 
 .menu-flourish-top {
   left: 18px;
-  bottom: 36px;
-  border-left: 2px solid rgba(255,255,255,0.32);
-  border-top: 2px solid rgba(255,255,255,0.32);
-  border-top-left-radius: 120px 80px;
+  bottom: 48px;
+  border-left: 2px solid rgba(255, 255, 255, 0.32);
+  border-top: 2px solid rgba(255, 255, 255, 0.32);
+  border-top-left-radius: 120px 72px;
 }
 
 .menu-flourish-bottom {
   right: 18px;
-  bottom: 36px;
-  border-right: 2px solid rgba(255,255,255,0.32);
-  border-top: 2px solid rgba(255,255,255,0.32);
-  border-top-right-radius: 120px 80px;
+  bottom: 48px;
+  border-right: 2px solid rgba(255, 255, 255, 0.32);
+  border-top: 2px solid rgba(255, 255, 255, 0.32);
+  border-top-right-radius: 120px 72px;
 }
 
 .menu-header {
+  position: relative;
+  z-index: 1;
   margin-bottom: 18px;
 }
 
-.menu-kicker {
-  display: block;
-  color: #c99b36;
-  letter-spacing: 0.16em;
-  font-size: 12px;
-  margin-bottom: 8px;
-  text-transform: uppercase;
-}
-
 .menu-title {
-  color: #f5f1e8;
-  margin: 0;
+  color: #f6f1e8;
   font-size: 32px;
-  line-height: 1.05;
+  line-height: 1.08;
+  margin: 0;
+  font-weight: 700;
 }
 
 .menu-items {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .menu-item {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
-  padding: 14px 0 15px;
-  border-bottom: 1px dashed rgba(255,255,255,0.09);
+  gap: 18px;
   align-items: flex-start;
+  padding: 12px 0 14px;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
 }
 
 .menu-copy {
-  min-width: 0;
   flex: 1;
+  min-width: 0;
 }
 
 .item-title-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 8px;
   flex-wrap: wrap;
+  margin-bottom: 7px;
 }
 
 .item-title {
-  margin: 0;
-  color: #f7f3ea;
+  color: #f6f1e8;
   font-size: 18px;
-  line-height: 1.3;
+  margin: 0;
+  font-weight: 700;
 }
 
 .item-badge {
-  display: inline-flex;
-  align-items: center;
-  height: 24px;
-  padding: 0 10px;
+  color: #e3be74;
+  background: rgba(212, 164, 66, 0.08);
+  border: 1px solid rgba(212, 164, 66, 0.24);
   border-radius: 999px;
+  padding: 4px 10px;
   font-size: 11px;
-  font-weight: 700;
-  border: 1px solid rgba(199,150,26,0.22);
-  color: #d4a848;
-  background: rgba(199,150,26,0.08);
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .item-desc {
-  margin: 0;
-  color: rgba(255,255,255,0.64);
-  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.64);
   font-size: 14px;
+  line-height: 1.65;
+  margin: 0;
 }
 
 .item-price {
-  min-width: 66px;
+  color: #f7f2ea;
+  font-size: 18px;
+  min-width: 64px;
   text-align: right;
-  color: #f5f1e8;
-  font-size: 18px;
   padding-top: 2px;
-}
-
-.toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border-radius: 18px;
-  background: rgba(247, 247, 248, 0.96);
-  box-shadow: 0 20px 40px rgba(0,0,0,0.26);
-  backdrop-filter: blur(12px);
-}
-
-.toolbar-mobile {
-  position: fixed;
-  left: 50%;
-  bottom: 18px;
-  transform: translateX(-50%);
-  z-index: 12;
-  width: min(330px, calc(100vw - 20px));
-  padding: 10px 12px;
-  border-radius: 22px;
-}
-
-.toolbar-btn {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  border: 1px solid rgba(0,0,0,0.08);
-  background: white;
-  color: #555;
-  font-size: 22px;
-}
-
-.toolbar-btn:disabled,
-.mobile-nav-btn:disabled,
-.nav-arrow:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.toolbar-indicator {
-  min-width: 102px;
-  height: 44px;
-  display: grid;
-  place-items: center;
-  border-radius: 12px;
-  background: #f6f6f6;
-  color: #444;
-  font-weight: 800;
-}
-
-.toolbar-btn-locale {
-  font-size: 18px;
-  font-weight: 800;
 }
 
 .nav-arrow {
   width: 58px;
   height: 58px;
   border-radius: 999px;
-  border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(10, 10, 12, 0.42);
-  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(10, 10, 12, 0.48);
+  color: white;
   font-size: 38px;
   line-height: 1;
+  display: grid;
+  place-items: center;
   cursor: pointer;
-  z-index: 8;
-  backdrop-filter: blur(10px);
   transition: all 0.22s ease;
+  backdrop-filter: blur(10px);
 }
 
 .nav-arrow:hover:not(:disabled),
 .mobile-nav-btn:hover:not(:disabled),
 .toolbar-btn:hover:not(:disabled) {
-  border-color: rgba(203,160,67,0.5);
-  color: #d9b25f;
+  border-color: rgba(212, 164, 66, 0.36);
+  color: #d6af60;
 }
 
-.nav-arrow-mobile {
-  display: none;
+.nav-arrow:disabled,
+.mobile-nav-btn:disabled,
+.toolbar-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
-@media (max-width: 1099px) {
-  .menu-card-screen {
-    padding: 18px 16px 90px;
-  }
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(243, 243, 243, 0.96);
+  padding: 10px 14px;
+  border-radius: 16px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+}
 
+.toolbar-mobile {
+  gap: 8px;
+  padding: 9px 10px;
+}
+
+.toolbar-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid rgba(18, 18, 18, 0.08);
+  background: white;
+  color: #555;
+  cursor: pointer;
+  font-size: 22px;
+  transition: all 0.2s ease;
+}
+
+.toolbar-btn-locale {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.toolbar-indicator {
+  min-width: 96px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid rgba(18, 18, 18, 0.06);
+  background: #f7f7f7;
+  color: #444;
+  display: grid;
+  place-items: center;
+  font-size: 17px;
+  padding: 0 10px;
+}
+
+@media (max-width: 1200px) {
   .viewer-shell {
-    grid-template-columns: 56px minmax(0, 1fr) 56px;
-    gap: 10px;
-  }
-
-  .book-frame {
-    min-height: 650px;
-  }
-
-  .menu-title {
-    font-size: 28px;
+    grid-template-columns: 58px minmax(0, 1fr) 58px;
+    gap: 12px;
   }
 
   .cover-title {
-    font-size: 52px;
+    font-size: 48px;
   }
 }
 
 @media (max-width: 767px) {
   .menu-card-screen {
-    padding: 14px 10px 94px;
-    place-items: start center;
+    padding: 16px 12px 32px;
+    align-items: start;
   }
 
   .ambient-top {
+    top: 2%;
     width: 260px;
-    top: 1%;
   }
 
   .ambient-left,
   .ambient-right {
     width: 120px;
-    height: 190px;
-    top: 24%;
-  }
-
-  .viewer-shell,
-  .viewer-shell-mobile {
-    width: 100%;
-    grid-template-columns: 1fr;
-  }
-
-  .nav-arrow {
-    display: none;
-  }
-
-  .mobile-actions-bar {
-    display: flex;
+    height: 200px;
+    top: 26%;
   }
 
   .viewer-center {
-    width: 100%;
     gap: 14px;
   }
 
-  .book-frame,
   .book-frame-mobile {
-    width: 100%;
-    min-height: auto;
-    padding: 10px 8px 14px;
-    border-radius: 28px;
+    padding-top: 34px;
   }
 
-  .frame-outline {
-    inset: 10px;
-    border-radius: 22px;
+  .flip-book-mobile {
+    width: min(92vw, 390px);
   }
 
-  .touch-hint {
-    top: 10px;
-    font-size: 11px;
-    padding: 7px 12px;
-  }
-
-  .page-inner-left,
-  .page-inner-right {
-    padding: 10px 8px;
-  }
-
-  .cover-surface,
   .menu-surface {
-    border-radius: 22px;
+    padding: 24px 18px 18px;
   }
 
-  .cover-surface-left,
-  .menu-surface-left,
-  .cover-surface-right,
-  .menu-surface-right {
-    border-radius: 22px;
+  .menu-title {
+    font-size: 24px;
+  }
+
+  .item-title {
+    font-size: 15px;
+  }
+
+  .item-desc {
+    font-size: 12px;
+    line-height: 1.55;
+  }
+
+  .item-price {
+    font-size: 15px;
+    min-width: 48px;
   }
 
   .cover-content {
-    padding: 46px 26px 28px;
+    padding: 36px 28px;
+  }
+
+  .cover-title {
+    font-size: 36px;
+  }
+
+  .cover-subtitle {
+    font-size: 14px;
+    line-height: 1.7;
+  }
+
+  .cover-meta {
+    gap: 8px;
+  }
+
+  .cover-meta span {
+    font-size: 11px;
+    padding: 8px 12px;
+  }
+
+  .toolbar-mobile {
+    width: min(390px, 100%);
+    justify-content: center;
+  }
+
+  .toolbar-mobile .toolbar-btn,
+  .toolbar-mobile .toolbar-indicator {
+    height: 38px;
+  }
+
+  .toolbar-mobile .toolbar-btn {
+    width: 38px;
+    font-size: 18px;
+  }
+
+  .toolbar-mobile .toolbar-indicator {
+    min-width: 78px;
+    font-size: 15px;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1100px) {
+  .menu-card-screen {
+    padding-inline: 16px;
+    padding-bottom: 108px;
+  }
+
+  .viewer-shell {
+    grid-template-columns: 48px minmax(0, 1fr) 48px;
+  }
+
+  .nav-arrow {
+    width: 48px;
+    height: 48px;
+    font-size: 30px;
+  }
+
+  .menu-surface {
+    padding: 24px 18px 18px;
+  }
+
+  .menu-title {
+    font-size: 24px;
+  }
+
+  .item-title {
+    font-size: 15px;
+  }
+
+  .item-desc {
+    font-size: 12px;
+  }
+
+  .item-price {
+    font-size: 15px;
+    min-width: 50px;
   }
 
   .cover-title {
@@ -1126,108 +1179,26 @@ onBeforeUnmount(() => {
 
   .cover-subtitle {
     font-size: 15px;
-    line-height: 1.8;
-  }
-
-  .cover-meta span {
-    font-size: 12px;
-    padding: 7px 12px;
-  }
-
-  .menu-surface {
-    padding: 22px 18px 18px;
-  }
-
-  .menu-title {
-    font-size: 25px;
-  }
-
-  .menu-item {
-    gap: 10px;
-    padding: 12px 0 13px;
-  }
-
-  .item-title {
-    font-size: 17px;
-  }
-
-  .item-desc {
-    font-size: 13px;
-    line-height: 1.65;
-  }
-
-  .item-price {
-    min-width: 56px;
-    font-size: 17px;
   }
 
   .toolbar {
-    gap: 8px;
+    gap: 6px;
+    padding: 8px 10px;
   }
 
   .toolbar-btn,
   .toolbar-indicator {
-    height: 42px;
+    height: 36px;
   }
 
   .toolbar-btn {
-    width: 42px;
+    width: 36px;
+    font-size: 18px;
   }
 
   .toolbar-indicator {
-    min-width: 90px;
-  }
-
-  :deep(.stf__wrapper)::after {
-    width: 10px;
-    opacity: 0.2;
-  }
-}
-
-@media (max-width: 420px) {
-  .mobile-actions-bar {
-    width: calc(100vw - 20px);
-  }
-
-  .mobile-nav-btn {
-    width: 42px;
-    height: 42px;
-    font-size: 26px;
-  }
-
-  .mobile-indicator-wrap {
-    padding: 8px 12px;
-  }
-
-  .book-frame,
-  .book-frame-mobile {
-    padding: 8px 7px 12px;
-  }
-
-  .cover-title {
-    font-size: 34px;
-  }
-
-  .menu-title {
-    font-size: 22px;
-  }
-
-  .item-title {
-    font-size: 16px;
-  }
-
-  .item-desc {
-    font-size: 12px;
-  }
-
-  .item-price {
-    min-width: 52px;
-    font-size: 16px;
-  }
-
-  .toolbar-mobile {
-    width: calc(100vw - 16px);
-    bottom: 10px;
+    min-width: 78px;
+    font-size: 15px;
   }
 }
 </style>
