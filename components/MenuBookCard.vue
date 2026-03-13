@@ -3,11 +3,11 @@
     <div class="ambient ambient-top"></div>
     <div class="ambient ambient-left"></div>
     <div class="ambient ambient-right"></div>
-    <div class="ambient ambient-gold"></div>
 
-    <div class="viewer-shell" :class="[`device-${deviceMode}`]">
+    <div class="viewer-shell" :class="{ 'viewer-shell-mobile': isMobile }">
       <button
-        class="nav-arrow nav-arrow-left nav-arrow-desktop"
+        class="nav-arrow nav-arrow-left"
+        :class="{ 'nav-arrow-mobile': isMobile }"
         type="button"
         :disabled="!ready || atStart"
         aria-label="Previous page"
@@ -17,9 +17,9 @@
       </button>
 
       <div class="viewer-center">
-        <div class="mobile-controls" v-if="isCompact">
+        <div v-if="isMobile" class="mobile-actions-bar">
           <button
-            class="nav-arrow nav-arrow-mobile"
+            class="mobile-nav-btn"
             type="button"
             :disabled="!ready || atStart"
             aria-label="Previous page"
@@ -27,14 +27,12 @@
           >
             ‹
           </button>
-
-          <div class="mobile-status">
-            <span class="mobile-status__label">{{ locale === 'ar' ? 'تصفح سلس' : 'Smooth Swipe' }}</span>
-            <strong class="mobile-status__value">{{ spreadIndicator }}</strong>
+          <div class="mobile-indicator-wrap">
+            <span class="mobile-indicator-label">{{ locale === 'ar' ? 'المنيو الرقمي' : 'Digital Menu' }}</span>
+            <strong class="mobile-indicator-value">{{ spreadIndicator }}</strong>
           </div>
-
           <button
-            class="nav-arrow nav-arrow-mobile"
+            class="mobile-nav-btn"
             type="button"
             :disabled="!ready || atEnd"
             aria-label="Next page"
@@ -44,22 +42,89 @@
           </button>
         </div>
 
-        <div class="book-frame" :class="[`device-${deviceMode}`]">
+        <div class="book-frame" :class="{ 'book-frame-mobile': isMobile, 'book-frame-tablet': isTablet && !isMobile }">
           <div class="frame-glow"></div>
-          <div class="frame-halo"></div>
-          <div class="book-sheen"></div>
-          <div ref="bookRef" class="flip-book"></div>
+          <div class="frame-outline"></div>
+          <div class="touch-hint" v-if="isMobile">
+            {{ locale === 'ar' ? 'اسحب الصفحة أو استخدم الأسهم' : 'Swipe pages or use arrows' }}
+          </div>
+
+          <div ref="bookRef" class="flip-book" :class="{ 'flip-book-mobile': isMobile }">
+            <div
+              v-for="page in pages"
+              :key="`${locale}-${page.id}`"
+              class="page js-page"
+              :class="[
+                page.type === 'cover' ? 'page-cover' : 'page-menu',
+                page.side === 'left' ? 'page-left' : 'page-right'
+              ]"
+            >
+              <div class="page-inner" :class="page.side === 'left' ? 'page-inner-left' : 'page-inner-right'">
+                <template v-if="page.type === 'cover'">
+                  <div class="cover-surface" :class="page.side === 'left' ? 'cover-surface-left' : 'cover-surface-right'">
+                    <div class="foil-outline"></div>
+                    <div class="cover-noise"></div>
+                    <div class="cover-orb cover-orb-top"></div>
+                    <div class="cover-orb cover-orb-bottom"></div>
+
+                    <template v-if="page.side === 'left'">
+                      <div class="cover-spine-mark"></div>
+                    </template>
+
+                    <template v-else>
+                      <div class="cover-content">
+                        <p class="cover-kicker">{{ ui.kicker }}</p>
+                        <h1 class="cover-title">{{ ui.coverTitle }}</h1>
+                        <p class="cover-subtitle">{{ ui.coverSubtitle }}</p>
+                        <div class="cover-meta">
+                          <span>{{ ui.premiumDining }}</span>
+                          <span>{{ ui.bookExperience }}</span>
+                        </div>
+                      </div>
+                    </template>
+                  </div>
+                </template>
+
+                <template v-else>
+                  <article class="menu-surface" :class="page.side === 'left' ? 'menu-surface-left' : 'menu-surface-right'">
+                    <div class="foil-outline"></div>
+                    <div class="menu-flourish menu-flourish-top"></div>
+                    <div class="menu-flourish menu-flourish-bottom"></div>
+
+                    <header class="menu-header">
+                      <span class="menu-kicker">{{ page.eyebrow }}</span>
+                      <h2 class="menu-title">{{ page.title }}</h2>
+                    </header>
+
+                    <div class="menu-items">
+                      <article
+                        v-for="item in page.items"
+                        :key="`${page.id}-${item.title}-${item.price}`"
+                        class="menu-item"
+                      >
+                        <div class="menu-copy">
+                          <div class="item-title-row">
+                            <h3 class="item-title">{{ item.title }}</h3>
+                            <span v-if="item.badge" class="item-badge">{{ item.badge }}</span>
+                          </div>
+                          <p class="item-desc">{{ item.desc }}</p>
+                        </div>
+                        <strong class="item-price">{{ item.price }}</strong>
+                      </article>
+                    </div>
+                  </article>
+                </template>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div class="mobile-hint" v-if="isCompact">
-          {{ locale === 'ar' ? 'اسحب الصفحة أو استخدم الأسهم' : 'Swipe the page or use arrows' }}
-        </div>
-
-        <div class="toolbar" :class="[`device-${deviceMode}`]">
+        <div class="toolbar" :class="{ 'toolbar-mobile': isMobile }">
           <button class="toolbar-btn" type="button" @click="zoomOut" aria-label="Zoom out">−</button>
           <button class="toolbar-btn" type="button" @click="zoomIn" aria-label="Zoom in">+</button>
           <button
-            class="toolbar-btn toolbar-btn-nav"
+            v-if="!isMobile"
+            class="toolbar-btn"
             type="button"
             :disabled="!ready || atStart"
             aria-label="Previous"
@@ -69,7 +134,8 @@
           </button>
           <div class="toolbar-indicator">{{ spreadIndicator }}</div>
           <button
-            class="toolbar-btn toolbar-btn-nav"
+            v-if="!isMobile"
+            class="toolbar-btn"
             type="button"
             :disabled="!ready || atEnd"
             aria-label="Next"
@@ -84,7 +150,8 @@
       </div>
 
       <button
-        class="nav-arrow nav-arrow-right nav-arrow-desktop"
+        class="nav-arrow nav-arrow-right"
+        :class="{ 'nav-arrow-mobile': isMobile }"
         type="button"
         :disabled="!ready || atEnd"
         aria-label="Next page"
@@ -120,11 +187,14 @@ const currentPage = ref(0)
 const currentSpread = ref(1)
 const totalSpreads = ref(1)
 const zoom = ref(1)
+const viewportWidth = ref(1280)
 const bookRef = ref<HTMLElement | null>(null)
-const viewportWidth = ref(1440)
 
 let pageFlip: PageFlipInstance | null = null
 let resizeTimer: ReturnType<typeof setTimeout> | null = null
+
+const isMobile = computed(() => viewportWidth.value < 768)
+const isTablet = computed(() => viewportWidth.value >= 768 && viewportWidth.value < 1100)
 
 const uiMap = {
   ar: {
@@ -176,14 +246,6 @@ const uiMap = {
 } as const
 
 const ui = computed(() => uiMap[locale.value])
-const isPhone = computed(() => viewportWidth.value <= 640)
-const isTablet = computed(() => viewportWidth.value > 640 && viewportWidth.value <= 980)
-const isCompact = computed(() => viewportWidth.value <= 980)
-const deviceMode = computed<'phone' | 'tablet' | 'desktop'>(() => {
-  if (isPhone.value) return 'phone'
-  if (isTablet.value) return 'tablet'
-  return 'desktop'
-})
 
 const pages = computed<PageModel[]>(() => {
   const currentUi = ui.value
@@ -231,48 +293,56 @@ const spreadIndicator = computed(() => `${currentSpread.value} / ${totalSpreads.
 const atStart = computed(() => currentPage.value <= 0)
 const atEnd = computed(() => currentPage.value >= pages.value.length - 1)
 
+function updateViewport() {
+  if (!process.client) return
+  viewportWidth.value = Math.round(window.visualViewport?.width || window.innerWidth || 1280)
+}
+
 function getFlipConfig() {
-  if (deviceMode.value === 'phone') {
+  if (isMobile.value) {
     return {
-      width: 345,
-      height: 560,
+      width: 356,
+      height: 592,
       minWidth: 280,
-      maxWidth: 390,
-      minHeight: 460,
-      maxHeight: 640,
+      maxWidth: 430,
+      minHeight: 430,
+      maxHeight: 720,
       usePortrait: true,
-      maxShadowOpacity: 0.28,
-      flippingTime: 720,
-      swipeDistance: 6
+      swipeDistance: 14,
+      flippingTime: 620,
+      mobileScrollSupport: true,
+      maxShadowOpacity: 0.28
     }
   }
 
-  if (deviceMode.value === 'tablet') {
+  if (isTablet.value) {
     return {
       width: 430,
-      height: 620,
-      minWidth: 320,
-      maxWidth: 450,
-      minHeight: 500,
-      maxHeight: 700,
-      usePortrait: true,
-      maxShadowOpacity: 0.34,
-      flippingTime: 780,
-      swipeDistance: 8
+      height: 650,
+      minWidth: 330,
+      maxWidth: 470,
+      minHeight: 460,
+      maxHeight: 720,
+      usePortrait: false,
+      swipeDistance: 20,
+      flippingTime: 760,
+      mobileScrollSupport: true,
+      maxShadowOpacity: 0.34
     }
   }
 
   return {
     width: 520,
     height: 720,
-    minWidth: 320,
-    maxWidth: 520,
-    minHeight: 440,
-    maxHeight: 720,
+    minWidth: 360,
+    maxWidth: 560,
+    minHeight: 520,
+    maxHeight: 760,
     usePortrait: false,
-    maxShadowOpacity: 0.44,
-    flippingTime: 900,
-    swipeDistance: 14
+    swipeDistance: 24,
+    flippingTime: 880,
+    mobileScrollSupport: false,
+    maxShadowOpacity: 0.42
   }
 }
 
@@ -297,17 +367,26 @@ async function initFlipBook(targetIndex = 0) {
 
   const { PageFlip } = await import('page-flip')
   const container = bookRef.value
-  const flipConfig = getFlipConfig()
+  const cfg = getFlipConfig()
 
   pageFlip = new PageFlip(container, {
-    ...flipConfig,
+    width: cfg.width,
+    height: cfg.height,
+    minWidth: cfg.minWidth,
+    maxWidth: cfg.maxWidth,
+    minHeight: cfg.minHeight,
+    maxHeight: cfg.maxHeight,
     size: 'stretch',
     showCover: true,
+    usePortrait: cfg.usePortrait,
     startZIndex: 10,
     autoSize: true,
+    maxShadowOpacity: cfg.maxShadowOpacity,
     drawShadow: true,
-    mobileScrollSupport: true,
-    clickEventForward: false,
+    flippingTime: cfg.flippingTime,
+    mobileScrollSupport: cfg.mobileScrollSupport,
+    swipeDistance: cfg.swipeDistance,
+    clickEventForward: true,
     useMouseEvents: true
   })
 
@@ -331,12 +410,12 @@ async function initFlipBook(targetIndex = 0) {
 
 function nextPage() {
   if (!pageFlip) return
-  pageFlip.flipNext(isCompact.value ? 'bottom' : 'top')
+  pageFlip.flipNext(isMobile.value ? 'bottom' : 'top')
 }
 
 function prevPage() {
   if (!pageFlip) return
-  pageFlip.flipPrev(isCompact.value ? 'bottom' : 'top')
+  pageFlip.flipPrev(isMobile.value ? 'bottom' : 'top')
 }
 
 function applyZoom() {
@@ -345,14 +424,14 @@ function applyZoom() {
 }
 
 function zoomIn() {
-  const max = isCompact.value ? 1.04 : 1.1
-  zoom.value = Math.min(max, +(zoom.value + 0.02).toFixed(2))
+  const maxZoom = isMobile.value ? 1.04 : 1.1
+  zoom.value = Math.min(maxZoom, +(zoom.value + 0.03).toFixed(2))
   applyZoom()
 }
 
 function zoomOut() {
-  const min = isCompact.value ? 0.94 : 0.92
-  zoom.value = Math.max(min, +(zoom.value - 0.02).toFixed(2))
+  const minZoom = isMobile.value ? 0.96 : 0.9
+  zoom.value = Math.max(minZoom, +(zoom.value - 0.03).toFixed(2))
   applyZoom()
 }
 
@@ -361,12 +440,18 @@ function toggleLocale() {
 }
 
 function handleResize() {
-  viewportWidth.value = window.innerWidth
+  updateViewport()
+  if (resizeTimer) clearTimeout(resizeTimer)
+  resizeTimer = setTimeout(() => {
+    const keepPage = currentPage.value
+    void initFlipBook(keepPage)
+  }, 180)
 }
 
 onMounted(async () => {
-  handleResize()
-  window.addEventListener('resize', handleResize)
+  updateViewport()
+  window.addEventListener('resize', handleResize, { passive: true })
+  window.visualViewport?.addEventListener?.('resize', handleResize, { passive: true })
   await initFlipBook(0)
 })
 
@@ -375,27 +460,13 @@ watch(locale, async () => {
   await initFlipBook(keepPage)
 })
 
-watch(deviceMode, async () => {
-  if (!process.client) return
-  const keepPage = currentPage.value
-  zoom.value = 1
-  if (resizeTimer) clearTimeout(resizeTimer)
-  resizeTimer = setTimeout(async () => {
-    await initFlipBook(keepPage)
-  }, 140)
-})
-
 onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize)
+  window.visualViewport?.removeEventListener?.('resize', handleResize)
+  if (resizeTimer) clearTimeout(resizeTimer)
   if (pageFlip) {
     pageFlip.destroy()
     pageFlip = null
-  }
-  if (process.client) {
-    window.removeEventListener('resize', handleResize)
-  }
-  if (resizeTimer) {
-    clearTimeout(resizeTimer)
-    resizeTimer = null
   }
 })
 </script>
@@ -408,13 +479,12 @@ onBeforeUnmount(() => {
   overflow: hidden;
   background:
     radial-gradient(circle at 50% 8%, rgba(212, 166, 71, 0.28), transparent 24%),
-    radial-gradient(circle at 14% 54%, rgba(255, 255, 255, 0.05), transparent 20%),
-    radial-gradient(circle at 86% 54%, rgba(255, 255, 255, 0.05), transparent 20%),
-    linear-gradient(180deg, #111216 0%, #0a0b0f 54%, #06070a 100%);
+    radial-gradient(circle at 12% 50%, rgba(255, 255, 255, 0.045), transparent 20%),
+    radial-gradient(circle at 88% 50%, rgba(255, 255, 255, 0.045), transparent 20%),
+    linear-gradient(180deg, #121319 0%, #0b0c11 54%, #07080b 100%);
   display: grid;
   place-items: center;
-  padding: 24px 20px 88px;
-  touch-action: pan-y;
+  padding: 24px 22px 92px;
 }
 
 .ambient {
@@ -427,7 +497,7 @@ onBeforeUnmount(() => {
 .ambient-top {
   width: 340px;
   height: 120px;
-  top: 3%;
+  top: 4%;
   left: 50%;
   transform: translateX(-50%);
   background: rgba(201, 151, 43, 0.34);
@@ -438,23 +508,14 @@ onBeforeUnmount(() => {
   width: 220px;
   height: 280px;
   top: 28%;
-  background: rgba(255, 255, 255, 0.045);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .ambient-left { left: 2%; }
 .ambient-right { right: 2%; }
 
-.ambient-gold {
-  width: 420px;
-  height: 140px;
-  bottom: 6%;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(197, 147, 40, 0.1);
-}
-
 .viewer-shell {
-  width: min(1320px, 100%);
+  width: min(1340px, 100%);
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr) 72px;
   align-items: center;
@@ -464,87 +525,127 @@ onBeforeUnmount(() => {
 .viewer-center {
   display: grid;
   place-items: center;
-  gap: 18px;
+  gap: 24px;
 }
 
-.mobile-controls {
-  width: min(100%, 420px);
-  display: grid;
-  grid-template-columns: 56px minmax(0, 1fr) 56px;
-  gap: 12px;
+.mobile-actions-bar {
+  width: min(460px, calc(100vw - 26px));
+  display: none;
   align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
 }
 
-.mobile-status {
-  min-height: 56px;
-  border-radius: 18px;
-  border: 1px solid rgba(212, 164, 66, 0.18);
-  background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02));
-  box-shadow: 0 10px 30px rgba(0,0,0,0.22);
-  display: grid;
-  place-items: center;
-  padding: 6px 12px;
+.mobile-nav-btn {
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(12, 13, 18, 0.78);
+  color: #fff;
+  font-size: 28px;
+  box-shadow: 0 14px 24px rgba(0,0,0,0.24);
 }
 
-.mobile-status__label {
-  color: rgba(255,255,255,0.6);
+.mobile-nav-btn:disabled { opacity: 0.32; }
+
+.mobile-indicator-wrap {
+  flex: 1;
+  min-width: 0;
+  border-radius: 999px;
+  padding: 9px 16px;
+  background: rgba(255,255,255,0.055);
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+  text-align: center;
+}
+
+.mobile-indicator-label {
+  display: block;
   font-size: 11px;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
+  color: rgba(255,255,255,0.58);
+  margin-bottom: 2px;
 }
 
-.mobile-status__value {
-  color: #f5efe3;
-  font-size: 17px;
-  line-height: 1.2;
+.mobile-indicator-value {
+  display: block;
+  color: #f5f1e8;
+  font-size: 16px;
 }
 
 .book-frame {
   position: relative;
-  width: min(1080px, 100%);
+  width: min(1140px, 100%);
+  min-height: 720px;
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 8px;
-  border-radius: 34px;
+  padding: 18px;
+  border-radius: 40px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  border: 1px solid rgba(255,255,255,0.045);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+}
+
+.book-frame-mobile {
+  width: min(460px, calc(100vw - 18px));
+  min-height: auto;
+  padding: 10px;
+  border-radius: 30px;
+}
+
+.book-frame-tablet {
+  width: min(920px, 100%);
 }
 
 .frame-glow {
   position: absolute;
-  inset: auto 8% -38px 8%;
-  height: 78px;
+  inset: auto 10% -38px 10%;
+  height: 86px;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(0, 0, 0, 0.52), transparent 70%);
-  filter: blur(18px);
+  background: radial-gradient(circle, rgba(0, 0, 0, 0.55), transparent 70%);
+  filter: blur(20px);
   pointer-events: none;
 }
 
-.frame-halo {
+.frame-outline {
   position: absolute;
-  inset: -10px;
-  border-radius: 38px;
+  inset: 16px;
+  border-radius: 32px;
   border: 1px solid rgba(255,255,255,0.04);
-  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
   pointer-events: none;
 }
 
-.book-sheen {
+.touch-hint {
   position: absolute;
-  inset: 12px 18px auto;
-  height: 18%;
-  border-radius: 22px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0));
-  opacity: 0.22;
-  pointer-events: none;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(9, 10, 14, 0.7);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.72);
+  font-size: 12px;
+  z-index: 3;
+  backdrop-filter: blur(8px);
 }
 
 .flip-book {
-  width: min(1040px, 100%);
-  max-width: 1040px;
+  width: min(1080px, 100%);
+  max-width: 1080px;
   height: auto;
   transform: scale(var(--menu-book-scale, 1));
   transform-origin: center center;
-  transition: transform 0.22s ease;
+  transition: transform 0.24s ease;
+  will-change: transform;
+}
+
+.flip-book-mobile {
+  width: 100%;
 }
 
 :deep(.stf__parent),
@@ -553,30 +654,32 @@ onBeforeUnmount(() => {
 }
 
 :deep(.stf__wrapper) {
-  overflow: visible !important;
+  touch-action: pan-y pinch-zoom;
 }
 
 :deep(.stf__wrapper)::after {
   content: '';
   position: absolute;
   left: 50%;
-  top: 2%;
+  top: 2.4%;
   transform: translateX(-50%);
-  width: 10px;
-  height: 96%;
+  width: 12px;
+  height: 95.2%;
   border-radius: 999px;
   pointer-events: none;
-  background: linear-gradient(180deg, rgba(0,0,0,0.5), rgba(216,166,70,0.14) 50%, rgba(0,0,0,0.5));
-  opacity: 0.28;
+  background: linear-gradient(180deg, rgba(0,0,0,0.56), rgba(216,166,70,0.1) 50%, rgba(0,0,0,0.56));
+  opacity: 0.38;
   filter: blur(1px);
 }
 
-:deep(.stf__item),
-:deep(.stf__block) {
+:deep(.stf__item) {
   background: transparent !important;
   padding: 0 !important;
-  margin: 0 !important;
+}
+
+:deep(.stf__block) {
   box-shadow: none !important;
+  margin: 0 !important;
 }
 
 .page {
@@ -592,11 +695,11 @@ onBeforeUnmount(() => {
 }
 
 .page-inner-left {
-  padding: 12px 4px 12px 12px;
+  padding: 12px 6px 12px 12px;
 }
 
 .page-inner-right {
-  padding: 12px 12px 12px 4px;
+  padding: 12px 12px 12px 6px;
 }
 
 .cover-surface,
@@ -607,81 +710,71 @@ onBeforeUnmount(() => {
   overflow: hidden;
   border-radius: 24px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.012)),
-    radial-gradient(circle at 50% 0%, rgba(212, 164, 66, 0.08), transparent 40%),
-    linear-gradient(180deg, #27282d 0%, #18191d 100%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.014)),
+    linear-gradient(180deg, #28292d 0%, #17181c 100%);
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.05),
     0 24px 60px rgba(0, 0, 0, 0.34);
-  backdrop-filter: blur(8px);
 }
 
 .cover-surface-left,
 .menu-surface-left {
-  border-top-right-radius: 6px;
-  border-bottom-right-radius: 6px;
+  border-top-right-radius: 10px;
+  border-bottom-right-radius: 10px;
 }
 
 .cover-surface-right,
 .menu-surface-right {
-  border-top-left-radius: 6px;
-  border-bottom-left-radius: 6px;
+  border-top-left-radius: 10px;
+  border-bottom-left-radius: 10px;
 }
 
 .foil-outline {
   position: absolute;
   inset: 16px;
-  border: 1px solid rgba(208, 164, 72, 0.16);
-  border-radius: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(199, 150, 26, 0.14);
   pointer-events: none;
 }
 
 .cover-noise {
   position: absolute;
   inset: 0;
-  opacity: 0.08;
-  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.18) 0.5px, transparent 0.5px);
-  background-size: 9px 9px;
+  opacity: 0.06;
+  background-image: radial-gradient(circle, rgba(255,255,255,0.18) 0.5px, transparent 0.5px);
+  background-size: 8px 8px;
 }
 
 .cover-orb {
   position: absolute;
+  width: 180px;
+  height: 180px;
   border-radius: 999px;
-  filter: blur(28px);
-  opacity: 0.35;
-  pointer-events: none;
+  filter: blur(60px);
+  opacity: 0.18;
 }
 
 .cover-orb-top {
-  width: 140px;
-  height: 140px;
-  top: 6%;
-  right: 6%;
-  background: rgba(212, 164, 66, 0.22);
+  top: -40px;
+  right: -12px;
+  background: rgba(199,150,26,0.34);
 }
 
 .cover-orb-bottom {
-  width: 160px;
-  height: 160px;
-  left: 0;
-  bottom: 0;
-  background: rgba(255, 255, 255, 0.06);
+  bottom: -60px;
+  left: -40px;
+  background: rgba(255,255,255,0.08);
 }
 
 .cover-spine-mark {
   position: absolute;
-  inset: 18px;
-  display: grid;
-  place-items: center;
-}
-
-.cover-spine-mark::before {
-  content: '';
-  width: 112px;
-  height: 112px;
+  top: 8%;
+  bottom: 8%;
+  right: 24px;
+  width: 8px;
   border-radius: 999px;
-  border: 1px solid rgba(212, 164, 66, 0.18);
-  box-shadow: inset 0 0 0 16px rgba(212, 164, 66, 0.02);
+  background: linear-gradient(180deg, rgba(0,0,0,0.72), rgba(255,255,255,0.08), rgba(0,0,0,0.72));
+  opacity: 0.52;
 }
 
 .cover-content {
@@ -693,91 +786,94 @@ onBeforeUnmount(() => {
   justify-content: center;
   align-items: center;
   text-align: center;
-  padding: 48px;
+  padding: 52px 42px;
 }
 
-.cover-kicker,
-.menu-kicker {
-  color: #d2a34a;
-  letter-spacing: 0.26em;
-  text-transform: uppercase;
-  font-size: 12px;
-  margin: 0 0 16px;
+.cover-kicker {
+  margin: 0 0 18px;
+  color: #d0a247;
+  font-size: 13px;
+  letter-spacing: 0.3em;
 }
 
 .cover-title {
-  color: #f6f1e8;
-  font-size: 60px;
+  margin: 0;
+  font-size: clamp(42px, 5vw, 66px);
   line-height: 1.02;
-  margin: 0 0 16px;
-  font-weight: 700;
+  color: #f6f2e9;
 }
 
 .cover-subtitle {
-  color: rgba(255, 255, 255, 0.76);
+  margin: 18px 0 0;
   font-size: 18px;
-  line-height: 1.82;
-  max-width: 340px;
-  margin: 0;
+  line-height: 1.9;
+  color: rgba(255,255,255,0.76);
+  max-width: 400px;
 }
 
 .cover-meta {
   margin-top: 28px;
   display: flex;
-  gap: 12px;
   flex-wrap: wrap;
   justify-content: center;
+  gap: 10px;
 }
 
 .cover-meta span {
-  color: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
-  padding: 10px 16px;
+  padding: 8px 14px;
   border-radius: 999px;
+  border: 1px solid rgba(199,150,26,0.18);
+  background: rgba(199,150,26,0.08);
+  color: #e7bf69;
   font-size: 13px;
 }
 
 .menu-surface {
-  padding: 30px 24px 22px;
+  padding: 28px 28px 22px;
 }
 
 .menu-flourish {
   position: absolute;
-  width: 126px;
-  height: 76px;
+  width: 150px;
+  height: 78px;
   opacity: 0.11;
   pointer-events: none;
 }
 
 .menu-flourish-top {
   left: 18px;
-  bottom: 44px;
-  border-left: 2px solid rgba(255, 255, 255, 0.3);
-  border-top: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-left-radius: 126px 76px;
+  bottom: 36px;
+  border-left: 2px solid rgba(255,255,255,0.32);
+  border-top: 2px solid rgba(255,255,255,0.32);
+  border-top-left-radius: 120px 80px;
 }
 
 .menu-flourish-bottom {
   right: 18px;
-  bottom: 44px;
-  border-right: 2px solid rgba(255, 255, 255, 0.3);
-  border-top: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-right-radius: 126px 76px;
+  bottom: 36px;
+  border-right: 2px solid rgba(255,255,255,0.32);
+  border-top: 2px solid rgba(255,255,255,0.32);
+  border-top-right-radius: 120px 80px;
 }
 
 .menu-header {
-  position: relative;
-  z-index: 1;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
+}
+
+.menu-kicker {
+  display: block;
+  color: #c99b36;
+  letter-spacing: 0.16em;
+  font-size: 12px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
 }
 
 .menu-title {
-  color: #f6f1e8;
-  font-size: 31px;
-  line-height: 1.04;
+  color: #f5f1e8;
   margin: 0;
-  font-weight: 700;
+  font-size: 32px;
+  line-height: 1.05;
 }
 
 .menu-items {
@@ -789,305 +885,349 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: space-between;
   gap: 16px;
+  padding: 14px 0 15px;
+  border-bottom: 1px dashed rgba(255,255,255,0.09);
   align-items: flex-start;
-  padding: 12px 0 13px;
-  border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
 }
 
 .menu-copy {
-  flex: 1;
   min-width: 0;
+  flex: 1;
 }
 
 .item-title-row {
   display: flex;
   align-items: center;
   gap: 10px;
+  margin-bottom: 8px;
   flex-wrap: wrap;
-  margin-bottom: 7px;
 }
 
 .item-title {
-  color: #f6f1e8;
-  font-size: 18px;
   margin: 0;
-  font-weight: 700;
+  color: #f7f3ea;
+  font-size: 18px;
+  line-height: 1.3;
 }
 
 .item-badge {
-  color: #e3be74;
-  background: rgba(212, 164, 66, 0.08);
-  border: 1px solid rgba(212, 164, 66, 0.24);
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
   border-radius: 999px;
-  padding: 4px 10px;
   font-size: 11px;
-  line-height: 1;
-  white-space: nowrap;
+  font-weight: 700;
+  border: 1px solid rgba(199,150,26,0.22);
+  color: #d4a848;
+  background: rgba(199,150,26,0.08);
 }
 
 .item-desc {
-  color: rgba(255, 255, 255, 0.64);
-  font-size: 14px;
-  line-height: 1.58;
   margin: 0;
+  color: rgba(255,255,255,0.64);
+  line-height: 1.7;
+  font-size: 14px;
 }
 
 .item-price {
-  color: #f7f2ea;
-  font-size: 18px;
-  min-width: 64px;
+  min-width: 66px;
   text-align: right;
+  color: #f5f1e8;
+  font-size: 18px;
   padding-top: 2px;
-}
-
-.nav-arrow {
-  width: 60px;
-  height: 60px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(10, 10, 12, 0.56);
-  color: white;
-  font-size: 38px;
-  line-height: 1;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  transition: all 0.22s ease;
-  backdrop-filter: blur(12px);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22);
-}
-
-.nav-arrow:hover:not(:disabled),
-.toolbar-btn:hover:not(:disabled) {
-  border-color: rgba(212, 164, 66, 0.36);
-  color: #d6af60;
-}
-
-.nav-arrow:disabled,
-.toolbar-btn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
 }
 
 .toolbar {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
-  background: rgba(243, 243, 243, 0.96);
   padding: 10px 14px;
-  border-radius: 16px;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
-  backdrop-filter: blur(14px);
+  border-radius: 18px;
+  background: rgba(247, 247, 248, 0.96);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.26);
+  backdrop-filter: blur(12px);
+}
+
+.toolbar-mobile {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 12;
+  width: min(330px, calc(100vw - 20px));
+  padding: 10px 12px;
+  border-radius: 22px;
 }
 
 .toolbar-btn {
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   border-radius: 12px;
-  border: 1px solid rgba(18, 18, 18, 0.08);
+  border: 1px solid rgba(0,0,0,0.08);
   background: white;
   color: #555;
-  cursor: pointer;
   font-size: 22px;
-  transition: all 0.2s ease;
 }
 
-.toolbar-btn-locale {
-  font-size: 17px;
-  font-weight: 700;
+.toolbar-btn:disabled,
+.mobile-nav-btn:disabled,
+.nav-arrow:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .toolbar-indicator {
-  min-width: 98px;
-  height: 42px;
-  border-radius: 12px;
-  border: 1px solid rgba(18, 18, 18, 0.06);
-  background: #f7f7f7;
-  color: #444;
+  min-width: 102px;
+  height: 44px;
   display: grid;
   place-items: center;
-  font-size: 17px;
-  padding: 0 10px;
-  font-weight: 700;
+  border-radius: 12px;
+  background: #f6f6f6;
+  color: #444;
+  font-weight: 800;
 }
 
-.mobile-hint {
-  color: rgba(255,255,255,0.68);
-  font-size: 12px;
-  letter-spacing: 0.06em;
+.toolbar-btn-locale {
+  font-size: 18px;
+  font-weight: 800;
 }
 
-@media (max-width: 1200px) {
+.nav-arrow {
+  width: 58px;
+  height: 58px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(10, 10, 12, 0.42);
+  color: #fff;
+  font-size: 38px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 8;
+  backdrop-filter: blur(10px);
+  transition: all 0.22s ease;
+}
+
+.nav-arrow:hover:not(:disabled),
+.mobile-nav-btn:hover:not(:disabled),
+.toolbar-btn:hover:not(:disabled) {
+  border-color: rgba(203,160,67,0.5);
+  color: #d9b25f;
+}
+
+.nav-arrow-mobile {
+  display: none;
+}
+
+@media (max-width: 1099px) {
+  .menu-card-screen {
+    padding: 18px 16px 90px;
+  }
+
   .viewer-shell {
-    grid-template-columns: 60px minmax(0, 1fr) 60px;
-    gap: 12px;
+    grid-template-columns: 56px minmax(0, 1fr) 56px;
+    gap: 10px;
+  }
+
+  .book-frame {
+    min-height: 650px;
+  }
+
+  .menu-title {
+    font-size: 28px;
   }
 
   .cover-title {
-    font-size: 48px;
+    font-size: 52px;
   }
 }
 
-@media (max-width: 980px) {
+@media (max-width: 767px) {
   .menu-card-screen {
-    padding-inline: 14px;
-    padding-bottom: 96px;
+    padding: 14px 10px 94px;
+    place-items: start center;
   }
 
-  .viewer-shell {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 12px;
+  .ambient-top {
+    width: 260px;
+    top: 1%;
   }
 
-  .nav-arrow-desktop {
+  .ambient-left,
+  .ambient-right {
+    width: 120px;
+    height: 190px;
+    top: 24%;
+  }
+
+  .viewer-shell,
+  .viewer-shell-mobile {
+    width: 100%;
+    grid-template-columns: 1fr;
+  }
+
+  .nav-arrow {
     display: none;
   }
 
-  .book-frame.device-tablet,
-  .book-frame.device-phone {
-    width: min(100%, 460px);
+  .mobile-actions-bar {
+    display: flex;
   }
 
-  :deep(.stf__wrapper)::after {
-    width: 6px;
-    opacity: 0.16;
+  .viewer-center {
+    width: 100%;
+    gap: 14px;
+  }
+
+  .book-frame,
+  .book-frame-mobile {
+    width: 100%;
+    min-height: auto;
+    padding: 10px 8px 14px;
+    border-radius: 28px;
+  }
+
+  .frame-outline {
+    inset: 10px;
+    border-radius: 22px;
+  }
+
+  .touch-hint {
+    top: 10px;
+    font-size: 11px;
+    padding: 7px 12px;
+  }
+
+  .page-inner-left,
+  .page-inner-right {
+    padding: 10px 8px;
+  }
+
+  .cover-surface,
+  .menu-surface {
+    border-radius: 22px;
+  }
+
+  .cover-surface-left,
+  .menu-surface-left,
+  .cover-surface-right,
+  .menu-surface-right {
+    border-radius: 22px;
+  }
+
+  .cover-content {
+    padding: 46px 26px 28px;
+  }
+
+  .cover-title {
+    font-size: 38px;
+  }
+
+  .cover-subtitle {
+    font-size: 15px;
+    line-height: 1.8;
+  }
+
+  .cover-meta span {
+    font-size: 12px;
+    padding: 7px 12px;
+  }
+
+  .menu-surface {
+    padding: 22px 18px 18px;
+  }
+
+  .menu-title {
+    font-size: 25px;
+  }
+
+  .menu-item {
+    gap: 10px;
+    padding: 12px 0 13px;
+  }
+
+  .item-title {
+    font-size: 17px;
+  }
+
+  .item-desc {
+    font-size: 13px;
+    line-height: 1.65;
+  }
+
+  .item-price {
+    min-width: 56px;
+    font-size: 17px;
   }
 
   .toolbar {
     gap: 8px;
-    padding: 8px 10px;
   }
 
   .toolbar-btn,
   .toolbar-indicator {
-    height: 38px;
+    height: 42px;
   }
 
   .toolbar-btn {
-    width: 38px;
-    font-size: 18px;
+    width: 42px;
   }
 
   .toolbar-indicator {
-    min-width: 86px;
-    font-size: 15px;
+    min-width: 90px;
+  }
+
+  :deep(.stf__wrapper)::after {
+    width: 10px;
+    opacity: 0.2;
   }
 }
 
-@media (max-width: 640px) {
-  .menu-card-screen {
-    padding: 18px 12px 86px;
+@media (max-width: 420px) {
+  .mobile-actions-bar {
+    width: calc(100vw - 20px);
   }
 
-  .ambient-top {
-    width: 240px;
-    height: 90px;
+  .mobile-nav-btn {
+    width: 42px;
+    height: 42px;
+    font-size: 26px;
   }
 
-  .ambient-left,
-  .ambient-right,
-  .ambient-gold {
-    opacity: 0.35;
+  .mobile-indicator-wrap {
+    padding: 8px 12px;
   }
 
-  .mobile-controls {
-    width: min(100%, 390px);
-    grid-template-columns: 52px minmax(0, 1fr) 52px;
-    gap: 10px;
-  }
-
-  .nav-arrow-mobile {
-    width: 52px;
-    height: 52px;
-    font-size: 30px;
-  }
-
-  .book-frame.device-phone {
-    width: min(100%, 392px);
-    padding: 4px;
-  }
-
-  .frame-halo {
-    inset: -4px;
-    border-radius: 28px;
-  }
-
-  .menu-surface {
-    padding: 22px 16px 18px;
-  }
-
-  .menu-title {
-    font-size: 22px;
-  }
-
-  .menu-kicker,
-  .cover-kicker {
-    font-size: 10px;
-    letter-spacing: 0.22em;
-    margin-bottom: 12px;
-  }
-
-  .item-title {
-    font-size: 15px;
-  }
-
-  .item-desc {
-    font-size: 12px;
-    line-height: 1.5;
-  }
-
-  .item-price {
-    font-size: 14px;
-    min-width: 48px;
+  .book-frame,
+  .book-frame-mobile {
+    padding: 8px 7px 12px;
   }
 
   .cover-title {
     font-size: 34px;
   }
 
-  .cover-subtitle {
-    font-size: 14px;
-    line-height: 1.7;
-    max-width: 260px;
+  .menu-title {
+    font-size: 22px;
   }
 
-  .cover-content {
-    padding: 24px 18px;
+  .item-title {
+    font-size: 16px;
   }
 
-  .cover-meta {
-    gap: 8px;
-    margin-top: 20px;
+  .item-desc {
+    font-size: 12px;
   }
 
-  .cover-meta span {
-    padding: 8px 12px;
-    font-size: 11px;
+  .item-price {
+    min-width: 52px;
+    font-size: 16px;
   }
 
-  .toolbar {
-    width: min(100%, 390px);
-    justify-content: center;
-    gap: 6px;
-    padding: 8px;
-    border-radius: 14px;
-  }
-
-  .toolbar-btn {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    font-size: 17px;
-  }
-
-  .toolbar-indicator {
-    min-width: 74px;
-    height: 36px;
-    font-size: 14px;
-  }
-
-  .mobile-hint {
-    font-size: 11px;
+  .toolbar-mobile {
+    width: calc(100vw - 16px);
+    bottom: 10px;
   }
 }
 </style>
