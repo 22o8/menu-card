@@ -3,10 +3,11 @@
     <div class="ambient ambient-top"></div>
     <div class="ambient ambient-left"></div>
     <div class="ambient ambient-right"></div>
+    <div class="ambient ambient-gold"></div>
 
-    <div class="viewer-shell">
+    <div class="viewer-shell" :class="[`device-${deviceMode}`]">
       <button
-        class="nav-arrow nav-arrow-left"
+        class="nav-arrow nav-arrow-left nav-arrow-desktop"
         type="button"
         :disabled="!ready || atStart"
         aria-label="Previous page"
@@ -16,83 +17,49 @@
       </button>
 
       <div class="viewer-center">
-        <div class="book-frame">
-          <div class="frame-glow"></div>
-          <div ref="bookRef" class="flip-book">
-            <div
-              v-for="page in pages"
-              :key="`${locale}-${page.id}`"
-              class="page js-page"
-              :class="[
-                page.type === 'cover' ? 'page-cover' : 'page-menu',
-                page.side === 'left' ? 'page-left' : 'page-right'
-              ]"
-            >
-              <div class="page-inner" :class="page.side === 'left' ? 'page-inner-left' : 'page-inner-right'">
-                <template v-if="page.type === 'cover'">
-                  <div class="cover-surface" :class="page.side === 'left' ? 'cover-surface-left' : 'cover-surface-right'">
-                    <div class="foil-outline"></div>
-                    <div class="cover-noise"></div>
-                    <div class="cover-orb cover-orb-top"></div>
-                    <div class="cover-orb cover-orb-bottom"></div>
+        <div class="mobile-controls" v-if="isCompact">
+          <button
+            class="nav-arrow nav-arrow-mobile"
+            type="button"
+            :disabled="!ready || atStart"
+            aria-label="Previous page"
+            @click="prevPage"
+          >
+            ‹
+          </button>
 
-                    <template v-if="page.side === 'left'">
-                      <div class="cover-spine-mark"></div>
-                    </template>
-
-                    <template v-else>
-                      <div class="cover-content">
-                        <p class="cover-kicker">{{ ui.kicker }}</p>
-                        <h1 class="cover-title">{{ ui.coverTitle }}</h1>
-                        <p class="cover-subtitle">{{ ui.coverSubtitle }}</p>
-                        <div class="cover-meta">
-                          <span>{{ ui.premiumDining }}</span>
-                          <span>{{ ui.bookExperience }}</span>
-                        </div>
-                      </div>
-                    </template>
-                  </div>
-                </template>
-
-                <template v-else>
-                  <article class="menu-surface" :class="page.side === 'left' ? 'menu-surface-left' : 'menu-surface-right'">
-                    <div class="foil-outline"></div>
-                    <div class="menu-flourish menu-flourish-top"></div>
-                    <div class="menu-flourish menu-flourish-bottom"></div>
-
-                    <header class="menu-header">
-                      <span class="menu-kicker">{{ page.eyebrow }}</span>
-                      <h2 class="menu-title">{{ page.title }}</h2>
-                    </header>
-
-                    <div class="menu-items">
-                      <article
-                        v-for="item in page.items"
-                        :key="`${page.id}-${item.title}-${item.price}`"
-                        class="menu-item"
-                      >
-                        <div class="menu-copy">
-                          <div class="item-title-row">
-                            <h3 class="item-title">{{ item.title }}</h3>
-                            <span v-if="item.badge" class="item-badge">{{ item.badge }}</span>
-                          </div>
-                          <p class="item-desc">{{ item.desc }}</p>
-                        </div>
-                        <strong class="item-price">{{ item.price }}</strong>
-                      </article>
-                    </div>
-                  </article>
-                </template>
-              </div>
-            </div>
+          <div class="mobile-status">
+            <span class="mobile-status__label">{{ locale === 'ar' ? 'تصفح سلس' : 'Smooth Swipe' }}</span>
+            <strong class="mobile-status__value">{{ spreadIndicator }}</strong>
           </div>
+
+          <button
+            class="nav-arrow nav-arrow-mobile"
+            type="button"
+            :disabled="!ready || atEnd"
+            aria-label="Next page"
+            @click="nextPage"
+          >
+            ›
+          </button>
         </div>
 
-        <div class="toolbar">
+        <div class="book-frame" :class="[`device-${deviceMode}`]">
+          <div class="frame-glow"></div>
+          <div class="frame-halo"></div>
+          <div class="book-sheen"></div>
+          <div ref="bookRef" class="flip-book"></div>
+        </div>
+
+        <div class="mobile-hint" v-if="isCompact">
+          {{ locale === 'ar' ? 'اسحب الصفحة أو استخدم الأسهم' : 'Swipe the page or use arrows' }}
+        </div>
+
+        <div class="toolbar" :class="[`device-${deviceMode}`]">
           <button class="toolbar-btn" type="button" @click="zoomOut" aria-label="Zoom out">−</button>
           <button class="toolbar-btn" type="button" @click="zoomIn" aria-label="Zoom in">+</button>
           <button
-            class="toolbar-btn"
+            class="toolbar-btn toolbar-btn-nav"
             type="button"
             :disabled="!ready || atStart"
             aria-label="Previous"
@@ -102,7 +69,7 @@
           </button>
           <div class="toolbar-indicator">{{ spreadIndicator }}</div>
           <button
-            class="toolbar-btn"
+            class="toolbar-btn toolbar-btn-nav"
             type="button"
             :disabled="!ready || atEnd"
             aria-label="Next"
@@ -117,7 +84,7 @@
       </div>
 
       <button
-        class="nav-arrow nav-arrow-right"
+        class="nav-arrow nav-arrow-right nav-arrow-desktop"
         type="button"
         :disabled="!ready || atEnd"
         aria-label="Next page"
@@ -154,8 +121,10 @@ const currentSpread = ref(1)
 const totalSpreads = ref(1)
 const zoom = ref(1)
 const bookRef = ref<HTMLElement | null>(null)
+const viewportWidth = ref(1440)
 
 let pageFlip: PageFlipInstance | null = null
+let resizeTimer: ReturnType<typeof setTimeout> | null = null
 
 const uiMap = {
   ar: {
@@ -207,6 +176,14 @@ const uiMap = {
 } as const
 
 const ui = computed(() => uiMap[locale.value])
+const isPhone = computed(() => viewportWidth.value <= 640)
+const isTablet = computed(() => viewportWidth.value > 640 && viewportWidth.value <= 980)
+const isCompact = computed(() => viewportWidth.value <= 980)
+const deviceMode = computed<'phone' | 'tablet' | 'desktop'>(() => {
+  if (isPhone.value) return 'phone'
+  if (isTablet.value) return 'tablet'
+  return 'desktop'
+})
 
 const pages = computed<PageModel[]>(() => {
   const currentUi = ui.value
@@ -254,6 +231,51 @@ const spreadIndicator = computed(() => `${currentSpread.value} / ${totalSpreads.
 const atStart = computed(() => currentPage.value <= 0)
 const atEnd = computed(() => currentPage.value >= pages.value.length - 1)
 
+function getFlipConfig() {
+  if (deviceMode.value === 'phone') {
+    return {
+      width: 345,
+      height: 560,
+      minWidth: 280,
+      maxWidth: 390,
+      minHeight: 460,
+      maxHeight: 640,
+      usePortrait: true,
+      maxShadowOpacity: 0.28,
+      flippingTime: 720,
+      swipeDistance: 6
+    }
+  }
+
+  if (deviceMode.value === 'tablet') {
+    return {
+      width: 430,
+      height: 620,
+      minWidth: 320,
+      maxWidth: 450,
+      minHeight: 500,
+      maxHeight: 700,
+      usePortrait: true,
+      maxShadowOpacity: 0.34,
+      flippingTime: 780,
+      swipeDistance: 8
+    }
+  }
+
+  return {
+    width: 520,
+    height: 720,
+    minWidth: 320,
+    maxWidth: 520,
+    minHeight: 440,
+    maxHeight: 720,
+    usePortrait: false,
+    maxShadowOpacity: 0.44,
+    flippingTime: 900,
+    swipeDistance: 14
+  }
+}
+
 function syncState() {
   if (!pageFlip) return
   currentPage.value = pageFlip.getCurrentPageIndex?.() ?? 0
@@ -275,25 +297,17 @@ async function initFlipBook(targetIndex = 0) {
 
   const { PageFlip } = await import('page-flip')
   const container = bookRef.value
+  const flipConfig = getFlipConfig()
 
   pageFlip = new PageFlip(container, {
-    width: 560,
-    height: 760,
-    minWidth: 280,
-    maxWidth: 560,
-    minHeight: 420,
-    maxHeight: 760,
+    ...flipConfig,
     size: 'stretch',
     showCover: true,
-    usePortrait: true,
     startZIndex: 10,
     autoSize: true,
-    maxShadowOpacity: 0.58,
     drawShadow: true,
-    flippingTime: 1100,
-    mobileScrollSupport: false,
-    swipeDistance: 24,
-    clickEventForward: true,
+    mobileScrollSupport: true,
+    clickEventForward: false,
     useMouseEvents: true
   })
 
@@ -309,21 +323,20 @@ async function initFlipBook(targetIndex = 0) {
     pageFlip.turnToPage(Math.min(targetIndex, pageNodes.length - 1))
   }
 
-  nextTick(() => {
-    applyZoom()
-    syncState()
-    ready.value = true
-  })
+  await nextTick()
+  applyZoom()
+  syncState()
+  ready.value = true
 }
 
 function nextPage() {
   if (!pageFlip) return
-  pageFlip.flipNext('top')
+  pageFlip.flipNext(isCompact.value ? 'bottom' : 'top')
 }
 
 function prevPage() {
   if (!pageFlip) return
-  pageFlip.flipPrev('top')
+  pageFlip.flipPrev(isCompact.value ? 'bottom' : 'top')
 }
 
 function applyZoom() {
@@ -332,12 +345,14 @@ function applyZoom() {
 }
 
 function zoomIn() {
-  zoom.value = Math.min(1.12, +(zoom.value + 0.04).toFixed(2))
+  const max = isCompact.value ? 1.04 : 1.1
+  zoom.value = Math.min(max, +(zoom.value + 0.02).toFixed(2))
   applyZoom()
 }
 
 function zoomOut() {
-  zoom.value = Math.max(0.9, +(zoom.value - 0.04).toFixed(2))
+  const min = isCompact.value ? 0.94 : 0.92
+  zoom.value = Math.max(min, +(zoom.value - 0.02).toFixed(2))
   applyZoom()
 }
 
@@ -345,7 +360,13 @@ function toggleLocale() {
   locale.value = locale.value === 'ar' ? 'en' : 'ar'
 }
 
+function handleResize() {
+  viewportWidth.value = window.innerWidth
+}
+
 onMounted(async () => {
+  handleResize()
+  window.addEventListener('resize', handleResize)
   await initFlipBook(0)
 })
 
@@ -354,136 +375,176 @@ watch(locale, async () => {
   await initFlipBook(keepPage)
 })
 
+watch(deviceMode, async () => {
+  if (!process.client) return
+  const keepPage = currentPage.value
+  zoom.value = 1
+  if (resizeTimer) clearTimeout(resizeTimer)
+  resizeTimer = setTimeout(async () => {
+    await initFlipBook(keepPage)
+  }, 140)
+})
+
 onBeforeUnmount(() => {
   if (pageFlip) {
     pageFlip.destroy()
     pageFlip = null
+  }
+  if (process.client) {
+    window.removeEventListener('resize', handleResize)
+  }
+  if (resizeTimer) {
+    clearTimeout(resizeTimer)
+    resizeTimer = null
   }
 })
 </script>
 
 <style scoped>
 .menu-card-screen {
-  min-height: 100svh;
+  min-height: 100vh;
   width: 100%;
   position: relative;
-  overflow: clip;
+  overflow: hidden;
   background:
-    radial-gradient(circle at 50% 2%, rgba(216, 171, 78, 0.26), transparent 20%),
-    radial-gradient(circle at 12% 50%, rgba(255, 255, 255, 0.045), transparent 18%),
-    radial-gradient(circle at 88% 50%, rgba(255, 255, 255, 0.045), transparent 18%),
-    linear-gradient(180deg, #111216 0%, #0a0b0f 58%, #07080b 100%);
+    radial-gradient(circle at 50% 8%, rgba(212, 166, 71, 0.28), transparent 24%),
+    radial-gradient(circle at 14% 54%, rgba(255, 255, 255, 0.05), transparent 20%),
+    radial-gradient(circle at 86% 54%, rgba(255, 255, 255, 0.05), transparent 20%),
+    linear-gradient(180deg, #111216 0%, #0a0b0f 54%, #06070a 100%);
   display: grid;
   place-items: center;
-  padding: clamp(18px, 3vw, 30px) clamp(12px, 2.2vw, 24px) max(88px, env(safe-area-inset-bottom));
-}
-
-.menu-card-screen::before,
-.menu-card-screen::after {
-  content: '';
-  position: absolute;
-  inset: auto;
-  pointer-events: none;
-  border-radius: 999px;
-  filter: blur(70px);
-  opacity: 0.45;
-}
-
-.menu-card-screen::before {
-  width: 34vw;
-  max-width: 420px;
-  min-width: 220px;
-  height: 10vw;
-  min-height: 80px;
-  left: 50%;
-  top: 4%;
-  transform: translateX(-50%);
-  background: rgba(209, 156, 53, 0.26);
-}
-
-.menu-card-screen::after {
-  width: 52vw;
-  max-width: 740px;
-  min-width: 260px;
-  height: 18vw;
-  min-height: 140px;
-  left: 50%;
-  bottom: 6%;
-  transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.42);
+  padding: 24px 20px 88px;
+  touch-action: pan-y;
 }
 
 .ambient {
   position: absolute;
   pointer-events: none;
-  filter: blur(70px);
-  opacity: 0.62;
+  filter: blur(60px);
+  opacity: 0.55;
 }
 
 .ambient-top {
-  width: min(420px, 36vw);
-  height: 136px;
-  top: 2%;
+  width: 340px;
+  height: 120px;
+  top: 3%;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(201, 151, 43, 0.28);
+  background: rgba(201, 151, 43, 0.34);
 }
 
 .ambient-left,
 .ambient-right {
-  width: min(260px, 18vw);
-  height: min(340px, 28vw);
-  top: 26%;
-  background: rgba(255, 255, 255, 0.035);
+  width: 220px;
+  height: 280px;
+  top: 28%;
+  background: rgba(255, 255, 255, 0.045);
 }
 
-.ambient-left { left: max(-40px, -2vw); }
-.ambient-right { right: max(-40px, -2vw); }
+.ambient-left { left: 2%; }
+.ambient-right { right: 2%; }
+
+.ambient-gold {
+  width: 420px;
+  height: 140px;
+  bottom: 6%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(197, 147, 40, 0.1);
+}
 
 .viewer-shell {
-  width: min(1380px, 100%);
+  width: min(1320px, 100%);
   display: grid;
-  grid-template-columns: clamp(44px, 5vw, 72px) minmax(0, 1fr) clamp(44px, 5vw, 72px);
+  grid-template-columns: 72px minmax(0, 1fr) 72px;
   align-items: center;
-  gap: clamp(8px, 1.5vw, 20px);
-  position: relative;
-  z-index: 1;
+  gap: 18px;
 }
 
 .viewer-center {
   display: grid;
   place-items: center;
-  gap: clamp(16px, 2vw, 26px);
-  width: 100%;
+  gap: 18px;
+}
+
+.mobile-controls {
+  width: min(100%, 420px);
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) 56px;
+  gap: 12px;
+  align-items: center;
+}
+
+.mobile-status {
+  min-height: 56px;
+  border-radius: 18px;
+  border: 1px solid rgba(212, 164, 66, 0.18);
+  background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02));
+  box-shadow: 0 10px 30px rgba(0,0,0,0.22);
+  display: grid;
+  place-items: center;
+  padding: 6px 12px;
+}
+
+.mobile-status__label {
+  color: rgba(255,255,255,0.6);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.mobile-status__value {
+  color: #f5efe3;
+  font-size: 17px;
+  line-height: 1.2;
 }
 
 .book-frame {
   position: relative;
-  width: min(1140px, 100%);
+  width: min(1080px, 100%);
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: clamp(4px, 0.8vw, 10px);
+  padding: 8px;
+  border-radius: 34px;
 }
 
 .frame-glow {
   position: absolute;
-  inset: auto 8% -28px 8%;
-  height: clamp(54px, 7vw, 78px);
+  inset: auto 8% -38px 8%;
+  height: 78px;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(0, 0, 0, 0.56), transparent 70%);
-  filter: blur(22px);
+  background: radial-gradient(circle, rgba(0, 0, 0, 0.52), transparent 70%);
+  filter: blur(18px);
+  pointer-events: none;
+}
+
+.frame-halo {
+  position: absolute;
+  inset: -10px;
+  border-radius: 38px;
+  border: 1px solid rgba(255,255,255,0.04);
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0));
+  pointer-events: none;
+}
+
+.book-sheen {
+  position: absolute;
+  inset: 12px 18px auto;
+  height: 18%;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0));
+  opacity: 0.22;
   pointer-events: none;
 }
 
 .flip-book {
-  width: min(1080px, 100%);
-  max-width: 1080px;
+  width: min(1040px, 100%);
+  max-width: 1040px;
   height: auto;
   transform: scale(var(--menu-book-scale, 1));
   transform-origin: center center;
-  transition: transform 0.28s ease;
-  will-change: transform;
+  transition: transform 0.22s ease;
 }
 
 :deep(.stf__parent),
@@ -492,38 +553,30 @@ onBeforeUnmount(() => {
 }
 
 :deep(.stf__wrapper) {
-  filter: drop-shadow(0 24px 44px rgba(0, 0, 0, 0.24));
+  overflow: visible !important;
 }
 
 :deep(.stf__wrapper)::after {
   content: '';
   position: absolute;
   left: 50%;
-  top: 2.2%;
+  top: 2%;
   transform: translateX(-50%);
-  width: clamp(6px, 1vw, 12px);
-  height: 95.6%;
+  width: 10px;
+  height: 96%;
   border-radius: 999px;
   pointer-events: none;
-  background: linear-gradient(180deg, rgba(0,0,0,0.42), rgba(216,166,70,0.08) 50%, rgba(0,0,0,0.42));
+  background: linear-gradient(180deg, rgba(0,0,0,0.5), rgba(216,166,70,0.14) 50%, rgba(0,0,0,0.5));
   opacity: 0.28;
-  filter: blur(0.6px);
+  filter: blur(1px);
 }
 
-:deep(.stf__block),
-:deep(.stf__item) {
+:deep(.stf__item),
+:deep(.stf__block) {
   background: transparent !important;
-  box-shadow: none !important;
-  margin: 0 !important;
   padding: 0 !important;
-}
-
-:deep(.stf__item--left .page-inner-left) {
-  padding-right: 4px;
-}
-
-:deep(.stf__item--right .page-inner-right) {
-  padding-left: 4px;
+  margin: 0 !important;
+  box-shadow: none !important;
 }
 
 .page {
@@ -539,11 +592,11 @@ onBeforeUnmount(() => {
 }
 
 .page-inner-left {
-  padding: 10px 2px 10px 10px;
+  padding: 12px 4px 12px 12px;
 }
 
 .page-inner-right {
-  padding: 10px 10px 10px 2px;
+  padding: 12px 12px 12px 4px;
 }
 
 .cover-surface,
@@ -555,28 +608,29 @@ onBeforeUnmount(() => {
   border-radius: 24px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.012)),
-    radial-gradient(circle at 50% 0%, rgba(212, 164, 66, 0.055), transparent 26%),
-    linear-gradient(180deg, #26272b 0%, #18191d 100%);
+    radial-gradient(circle at 50% 0%, rgba(212, 164, 66, 0.08), transparent 40%),
+    linear-gradient(180deg, #27282d 0%, #18191d 100%);
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.055),
-    0 22px 54px rgba(0, 0, 0, 0.34);
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 24px 60px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(8px);
 }
 
 .cover-surface-left,
 .menu-surface-left {
-  border-top-right-radius: 10px;
-  border-bottom-right-radius: 10px;
+  border-top-right-radius: 6px;
+  border-bottom-right-radius: 6px;
 }
 
 .cover-surface-right,
 .menu-surface-right {
-  border-top-left-radius: 10px;
-  border-bottom-left-radius: 10px;
+  border-top-left-radius: 6px;
+  border-bottom-left-radius: 6px;
 }
 
 .foil-outline {
   position: absolute;
-  inset: clamp(14px, 2vw, 18px);
+  inset: 16px;
   border: 1px solid rgba(208, 164, 72, 0.16);
   border-radius: 14px;
   pointer-events: none;
@@ -599,16 +653,16 @@ onBeforeUnmount(() => {
 }
 
 .cover-orb-top {
-  width: min(140px, 28vw);
-  height: min(140px, 28vw);
+  width: 140px;
+  height: 140px;
   top: 6%;
   right: 6%;
   background: rgba(212, 164, 66, 0.22);
 }
 
 .cover-orb-bottom {
-  width: min(160px, 30vw);
-  height: min(160px, 30vw);
+  width: 160px;
+  height: 160px;
   left: 0;
   bottom: 0;
   background: rgba(255, 255, 255, 0.06);
@@ -623,8 +677,8 @@ onBeforeUnmount(() => {
 
 .cover-spine-mark::before {
   content: '';
-  width: min(110px, 26vw);
-  height: min(110px, 26vw);
+  width: 112px;
+  height: 112px;
   border-radius: 999px;
   border: 1px solid rgba(212, 164, 66, 0.18);
   box-shadow: inset 0 0 0 16px rgba(212, 164, 66, 0.02);
@@ -639,7 +693,7 @@ onBeforeUnmount(() => {
   justify-content: center;
   align-items: center;
   text-align: center;
-  padding: clamp(28px, 5vw, 48px);
+  padding: 48px;
 }
 
 .cover-kicker,
@@ -647,26 +701,24 @@ onBeforeUnmount(() => {
   color: #d2a34a;
   letter-spacing: 0.26em;
   text-transform: uppercase;
-  font-size: clamp(10px, 1vw, 12px);
-  margin: 0 0 18px;
+  font-size: 12px;
+  margin: 0 0 16px;
 }
 
 .cover-title {
   color: #f6f1e8;
-  font-size: clamp(28px, 4.2vw, 60px);
-  line-height: 1.04;
-  margin: 0 0 18px;
+  font-size: 60px;
+  line-height: 1.02;
+  margin: 0 0 16px;
   font-weight: 700;
-  text-wrap: balance;
 }
 
 .cover-subtitle {
   color: rgba(255, 255, 255, 0.76);
-  font-size: clamp(14px, 1.4vw, 18px);
-  line-height: 1.8;
+  font-size: 18px;
+  line-height: 1.82;
   max-width: 340px;
   margin: 0;
-  text-wrap: balance;
 }
 
 .cover-meta {
@@ -683,62 +735,62 @@ onBeforeUnmount(() => {
   background: rgba(255, 255, 255, 0.03);
   padding: 10px 16px;
   border-radius: 999px;
-  font-size: clamp(11px, 1vw, 13px);
+  font-size: 13px;
 }
 
 .menu-surface {
-  padding: clamp(18px, 3vw, 34px) clamp(14px, 2.4vw, 28px) clamp(16px, 2vw, 24px);
+  padding: 30px 24px 22px;
 }
 
 .menu-flourish {
   position: absolute;
-  width: clamp(80px, 10vw, 120px);
-  height: clamp(48px, 6vw, 72px);
-  opacity: 0.1;
+  width: 126px;
+  height: 76px;
+  opacity: 0.11;
   pointer-events: none;
 }
 
 .menu-flourish-top {
   left: 18px;
   bottom: 44px;
-  border-left: 2px solid rgba(255, 255, 255, 0.28);
-  border-top: 2px solid rgba(255, 255, 255, 0.28);
-  border-top-left-radius: 120px 72px;
+  border-left: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-left-radius: 126px 76px;
 }
 
 .menu-flourish-bottom {
   right: 18px;
   bottom: 44px;
-  border-right: 2px solid rgba(255, 255, 255, 0.28);
-  border-top: 2px solid rgba(255, 255, 255, 0.28);
-  border-top-right-radius: 120px 72px;
+  border-right: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-right-radius: 126px 76px;
 }
 
 .menu-header {
   position: relative;
   z-index: 1;
-  margin-bottom: clamp(14px, 2vw, 18px);
+  margin-bottom: 16px;
 }
 
 .menu-title {
   color: #f6f1e8;
-  font-size: clamp(22px, 2.6vw, 32px);
-  line-height: 1.08;
+  font-size: 31px;
+  line-height: 1.04;
   margin: 0;
   font-weight: 700;
 }
 
 .menu-items {
   display: grid;
-  gap: clamp(8px, 1.2vw, 10px);
+  gap: 8px;
 }
 
 .menu-item {
   display: flex;
   justify-content: space-between;
-  gap: clamp(10px, 1.5vw, 18px);
+  gap: 16px;
   align-items: flex-start;
-  padding: clamp(10px, 1.4vw, 12px) 0 clamp(12px, 1.8vw, 14px);
+  padding: 12px 0 13px;
   border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
 }
 
@@ -757,7 +809,7 @@ onBeforeUnmount(() => {
 
 .item-title {
   color: #f6f1e8;
-  font-size: clamp(14px, 1.5vw, 18px);
+  font-size: 18px;
   margin: 0;
   font-weight: 700;
 }
@@ -768,48 +820,47 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(212, 164, 66, 0.24);
   border-radius: 999px;
   padding: 4px 10px;
-  font-size: clamp(10px, .85vw, 11px);
+  font-size: 11px;
   line-height: 1;
   white-space: nowrap;
 }
 
 .item-desc {
   color: rgba(255, 255, 255, 0.64);
-  font-size: clamp(11px, 1.08vw, 14px);
-  line-height: 1.62;
+  font-size: 14px;
+  line-height: 1.58;
   margin: 0;
 }
 
 .item-price {
   color: #f7f2ea;
-  font-size: clamp(14px, 1.45vw, 18px);
-  min-width: clamp(50px, 5vw, 68px);
+  font-size: 18px;
+  min-width: 64px;
   text-align: right;
   padding-top: 2px;
 }
 
 .nav-arrow {
-  width: clamp(44px, 5vw, 58px);
-  height: clamp(44px, 5vw, 58px);
+  width: 60px;
+  height: 60px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(10, 10, 12, 0.52);
+  background: rgba(10, 10, 12, 0.56);
   color: white;
-  font-size: clamp(28px, 3vw, 38px);
+  font-size: 38px;
   line-height: 1;
   display: grid;
   place-items: center;
   cursor: pointer;
   transition: all 0.22s ease;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 12px 26px rgba(0,0,0,0.2);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22);
 }
 
 .nav-arrow:hover:not(:disabled),
 .toolbar-btn:hover:not(:disabled) {
   border-color: rgba(212, 164, 66, 0.36);
   color: #d6af60;
-  transform: translateY(-1px);
 }
 
 .nav-arrow:disabled,
@@ -821,154 +872,222 @@ onBeforeUnmount(() => {
 .toolbar {
   display: flex;
   align-items: center;
-  gap: clamp(6px, 1vw, 10px);
-  background: rgba(243, 243, 243, 0.97);
-  padding: clamp(8px, 1vw, 10px) clamp(10px, 1.2vw, 14px);
-  border-radius: 18px;
+  gap: 10px;
+  background: rgba(243, 243, 243, 0.96);
+  padding: 10px 14px;
+  border-radius: 16px;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
-  max-width: calc(100vw - 24px);
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scrollbar-width: none;
+  backdrop-filter: blur(14px);
 }
 
-.toolbar::-webkit-scrollbar { display: none; }
-
 .toolbar-btn {
-  width: clamp(36px, 4vw, 40px);
-  height: clamp(36px, 4vw, 40px);
+  width: 42px;
+  height: 42px;
   border-radius: 12px;
   border: 1px solid rgba(18, 18, 18, 0.08);
   background: white;
   color: #555;
   cursor: pointer;
-  font-size: clamp(18px, 1.8vw, 22px);
+  font-size: 22px;
   transition: all 0.2s ease;
-  flex: 0 0 auto;
 }
 
 .toolbar-btn-locale {
-  font-size: clamp(14px, 1.2vw, 17px);
+  font-size: 17px;
   font-weight: 700;
 }
 
 .toolbar-indicator {
-  min-width: clamp(70px, 8vw, 96px);
-  height: clamp(36px, 4vw, 40px);
+  min-width: 98px;
+  height: 42px;
   border-radius: 12px;
   border: 1px solid rgba(18, 18, 18, 0.06);
   background: #f7f7f7;
   color: #444;
   display: grid;
   place-items: center;
-  font-size: clamp(14px, 1.4vw, 17px);
+  font-size: 17px;
   padding: 0 10px;
-  flex: 0 0 auto;
+  font-weight: 700;
+}
+
+.mobile-hint {
+  color: rgba(255,255,255,0.68);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+
+@media (max-width: 1200px) {
+  .viewer-shell {
+    grid-template-columns: 60px minmax(0, 1fr) 60px;
+    gap: 12px;
+  }
+
+  .cover-title {
+    font-size: 48px;
+  }
 }
 
 @media (max-width: 980px) {
+  .menu-card-screen {
+    padding-inline: 14px;
+    padding-bottom: 96px;
+  }
+
   .viewer-shell {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
   }
 
-  .nav-arrow {
-    position: absolute;
-    top: 50%;
-    z-index: 5;
+  .nav-arrow-desktop {
+    display: none;
   }
 
-  .nav-arrow-left { left: 0; transform: translateY(-50%); }
-  .nav-arrow-right { right: 0; transform: translateY(-50%); }
-
-  .book-frame {
-    width: 100%;
-    padding-inline: 34px;
+  .book-frame.device-tablet,
+  .book-frame.device-phone {
+    width: min(100%, 460px);
   }
 
   :deep(.stf__wrapper)::after {
-    opacity: 0.2;
+    width: 6px;
+    opacity: 0.16;
+  }
+
+  .toolbar {
+    gap: 8px;
+    padding: 8px 10px;
+  }
+
+  .toolbar-btn,
+  .toolbar-indicator {
+    height: 38px;
+  }
+
+  .toolbar-btn {
+    width: 38px;
+    font-size: 18px;
+  }
+
+  .toolbar-indicator {
+    min-width: 86px;
+    font-size: 15px;
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 640px) {
   .menu-card-screen {
-    padding-inline: 10px;
-    padding-bottom: max(86px, calc(76px + env(safe-area-inset-bottom)));
+    padding: 18px 12px 86px;
   }
 
-  .book-frame {
-    padding-inline: 8px;
+  .ambient-top {
+    width: 240px;
+    height: 90px;
   }
 
-  .page-inner-left,
-  .page-inner-right {
-    padding: 8px;
+  .ambient-left,
+  .ambient-right,
+  .ambient-gold {
+    opacity: 0.35;
+  }
+
+  .mobile-controls {
+    width: min(100%, 390px);
+    grid-template-columns: 52px minmax(0, 1fr) 52px;
+    gap: 10px;
+  }
+
+  .nav-arrow-mobile {
+    width: 52px;
+    height: 52px;
+    font-size: 30px;
+  }
+
+  .book-frame.device-phone {
+    width: min(100%, 392px);
+    padding: 4px;
+  }
+
+  .frame-halo {
+    inset: -4px;
+    border-radius: 28px;
+  }
+
+  .menu-surface {
+    padding: 22px 16px 18px;
+  }
+
+  .menu-title {
+    font-size: 22px;
+  }
+
+  .menu-kicker,
+  .cover-kicker {
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    margin-bottom: 12px;
+  }
+
+  .item-title {
+    font-size: 15px;
+  }
+
+  .item-desc {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .item-price {
+    font-size: 14px;
+    min-width: 48px;
+  }
+
+  .cover-title {
+    font-size: 34px;
+  }
+
+  .cover-subtitle {
+    font-size: 14px;
+    line-height: 1.7;
+    max-width: 260px;
+  }
+
+  .cover-content {
+    padding: 24px 18px;
   }
 
   .cover-meta {
     gap: 8px;
+    margin-top: 20px;
   }
 
   .cover-meta span {
     padding: 8px 12px;
-  }
-
-  .menu-surface {
-    padding: 18px 14px 14px;
-  }
-
-  .menu-flourish {
-    opacity: 0.08;
-  }
-
-  .menu-item {
-    gap: 10px;
-  }
-
-  .item-title-row {
-    gap: 8px;
+    font-size: 11px;
   }
 
   .toolbar {
-    width: min(100%, 520px);
+    width: min(100%, 390px);
     justify-content: center;
-    border-radius: 16px;
-  }
-}
-
-@media (max-width: 560px) {
-  .ambient-left,
-  .ambient-right {
-    display: none;
-  }
-
-  .nav-arrow {
-    width: 42px;
-    height: 42px;
-    font-size: 26px;
-    background: rgba(10, 10, 12, 0.62);
-  }
-
-  .nav-arrow-left { left: 2px; }
-  .nav-arrow-right { right: 2px; }
-
-  .book-frame {
-    padding-inline: 0;
-  }
-
-  .toolbar {
     gap: 6px;
     padding: 8px;
+    border-radius: 14px;
   }
 
-  .toolbar-btn:nth-child(1),
-  .toolbar-btn:nth-child(2) {
-    display: none;
+  .toolbar-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    font-size: 17px;
   }
 
-  .cover-kicker,
-  .menu-kicker {
-    letter-spacing: 0.18em;
+  .toolbar-indicator {
+    min-width: 74px;
+    height: 36px;
+    font-size: 14px;
+  }
+
+  .mobile-hint {
+    font-size: 11px;
   }
 }
 </style>
