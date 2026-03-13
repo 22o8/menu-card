@@ -5,11 +5,19 @@
   "scripts": {
     "dev": "nuxt dev",
     "build": "nuxt build",
-    "preview": "nuxt preview"
+    "preview": "nuxt preview",
+    "postinstall": "node scripts/ensure-tinyexec.mjs"
   },
   "dependencies": {
     "nuxt": "^3.17.5",
     "page-flip": "^2.0.7",
-    "vue": "^3.5.13"
+    "vue": "^3.5.13",
+    "tinyexec": "1.0.2"
+  },
+  "overrides": {
+    "tinyexec": "1.0.2"
+  },
+  "engines": {
+    "node": "22.x"
   }
 }
