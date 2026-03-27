@@ -1,168 +1,128 @@
 <template>
-  <section
-    class="book-stage"
-    :class="{ 'is-mobile': isMobile, 'is-cover-view': !bookOpened }"
-    :dir="locale === 'ar' ? 'rtl' : 'ltr'"
-    @touchstart.passive="onTouchStart"
-    @touchend.passive="onTouchEnd"
-  >
-    <div class="book-shell">
-      <button
-        class="book-nav book-nav--prev"
-        type="button"
-        :disabled="!canGoPrev"
-        aria-label="Previous"
-        @click="goPrev"
-      >
-        <span>‹</span>
-      </button>
+  <section class="menu-book-screen" :dir="locale === 'ar' ? 'rtl' : 'ltr'">
+    <ClientOnly>
+      <div class="menu-book-stage" :class="{ 'is-ready': bookReady, 'is-fallback': fallbackMode }">
+        <div class="menu-book-shell">
+          <div ref="bookRef" class="menu-book"></div>
+        </div>
 
-      <div class="book-frame" :class="{ 'book-frame--cover': !bookOpened }">
-        <div class="book-cover-glow" aria-hidden="true"></div>
-        <div class="book-shell-shadow" aria-hidden="true"></div>
+        <div ref="pagesRef" class="menu-book-pages-source" aria-hidden="true">
+          <article class="menu-page menu-page--cover" data-density="hard">
+            <div class="cover-page">
+              <div class="cover-page__texture"></div>
+              <div class="cover-page__shine"></div>
+              <div class="cover-page__inner">
+                <span class="cover-page__eyebrow">{{ coverLabels.eyebrow }}</span>
+                <h1 class="cover-page__title">{{ coverLabels.title }}</h1>
+                <p class="cover-page__subtitle">{{ coverLabels.subtitle }}</p>
+                <div class="cover-page__seal">
+                  <span>{{ coverLabels.sealTop }}</span>
+                  <strong>{{ coverLabels.sealBottom }}</strong>
+                </div>
+              </div>
+              <div class="cover-page__spine"></div>
+            </div>
+          </article>
 
-        <Transition :name="bookOpened ? transitionName : 'cover-open'" mode="out-in">
-          <button
-            v-if="!bookOpened"
-            key="cover"
-            type="button"
-            class="book-cover"
-            @click="goNext"
+          <article
+            v-for="(page, index) in localizedPages"
+            :key="page.id"
+            class="menu-page"
+            :class="page.side === 'left' ? 'menu-page--left' : 'menu-page--right'"
           >
-            <div class="book-cover__edge" aria-hidden="true"></div>
-            <div class="book-cover__hinge" aria-hidden="true"></div>
-            <div class="book-cover__shine" aria-hidden="true"></div>
-            <div class="book-cover__content">
-              <span class="book-cover__eyebrow">{{ coverLabels.eyebrow }}</span>
-              <h1 class="book-cover__title">{{ coverLabels.title }}</h1>
-              <p class="book-cover__subtitle">{{ coverLabels.subtitle }}</p>
+            <div class="paper-page">
+              <div class="paper-page__grain"></div>
+              <div class="paper-page__shadow"></div>
+              <div class="paper-page__corner paper-page__corner--top"></div>
+              <div class="paper-page__corner paper-page__corner--bottom"></div>
 
-              <div class="book-cover__seal">
+              <header class="paper-page__header">
+                <span class="paper-page__kicker">{{ labels.menu }}</span>
+                <h2 class="paper-page__title">{{ page.title }}</h2>
+                <span class="paper-page__folio">{{ index + 1 }}</span>
+              </header>
+
+              <div class="paper-list">
+                <article
+                  v-for="item in page.items"
+                  :key="`${page.id}-${item.title}-${item.price}`"
+                  class="paper-item"
+                >
+                  <div class="paper-item__main">
+                    <div class="paper-item__topline">
+                      <h3 class="paper-item__title">{{ item.title }}</h3>
+                      <span v-if="item.badge" class="paper-item__badge">{{ item.badge }}</span>
+                    </div>
+                    <p class="paper-item__desc">{{ item.desc }}</p>
+                  </div>
+                  <strong class="paper-item__price">{{ item.price }}</strong>
+                </article>
+              </div>
+            </div>
+          </article>
+
+          <article class="menu-page menu-page--back" data-density="hard">
+            <div class="back-page">
+              <div class="back-page__inner">
+                <span>{{ coverLabels.backTop }}</span>
+                <strong>{{ coverLabels.backBottom }}</strong>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <div v-if="fallbackMode" class="menu-fallback-list">
+          <article class="cover-page cover-page--fallback">
+            <div class="cover-page__texture"></div>
+            <div class="cover-page__shine"></div>
+            <div class="cover-page__inner">
+              <span class="cover-page__eyebrow">{{ coverLabels.eyebrow }}</span>
+              <h1 class="cover-page__title">{{ coverLabels.title }}</h1>
+              <p class="cover-page__subtitle">{{ coverLabels.subtitle }}</p>
+              <div class="cover-page__seal">
                 <span>{{ coverLabels.sealTop }}</span>
                 <strong>{{ coverLabels.sealBottom }}</strong>
               </div>
-
-              <div class="book-cover__hint">
-                <span class="book-cover__hint-line"></span>
-                <span>{{ coverLabels.hint }}</span>
-                <span class="book-cover__hint-line"></span>
-              </div>
             </div>
-          </button>
+            <div class="cover-page__spine"></div>
+          </article>
 
-          <div v-else-if="isMobile" :key="`page-${mobilePageIndex}`" class="book-mobile-page-wrap">
-            <article class="book-page book-page--mobile" :class="pageSideClass(mobilePages[mobilePageIndex]?.side)">
-              <div class="book-page__paper"></div>
-              <div class="book-page__paper-grain"></div>
-              <div class="book-page__ornament book-page__ornament--top"></div>
-              <div class="book-page__ornament book-page__ornament--bottom"></div>
+          <article
+            v-for="(page, index) in localizedPages"
+            :key="`fallback-${page.id}`"
+            class="paper-page paper-page--fallback"
+          >
+            <header class="paper-page__header">
+              <span class="paper-page__kicker">{{ labels.menu }}</span>
+              <h2 class="paper-page__title">{{ page.title }}</h2>
+              <span class="paper-page__folio">{{ index + 1 }}</span>
+            </header>
 
-              <header class="book-page__header">
-                <span class="book-page__kicker">{{ labels.menu }}</span>
-                <h2 class="book-page__title">{{ mobilePages[mobilePageIndex]?.title }}</h2>
-                <div class="book-page__folio">{{ mobilePageIndex + 1 }} / {{ mobilePages.length }}</div>
-              </header>
-
-              <div class="book-list">
-                <article
-                  v-for="item in mobilePages[mobilePageIndex]?.items ?? []"
-                  :key="`${mobilePages[mobilePageIndex]?.id}-${item.title}-${item.price}`"
-                  class="book-item"
-                >
-                  <div class="book-item__copy">
-                    <div class="book-item__top">
-                      <h3 class="book-item__title">{{ item.title }}</h3>
-                      <span v-if="item.badge" class="book-item__badge">{{ item.badge }}</span>
-                    </div>
-                    <p class="book-item__desc">{{ item.desc }}</p>
+            <div class="paper-list">
+              <article
+                v-for="item in page.items"
+                :key="`fallback-${page.id}-${item.title}-${item.price}`"
+                class="paper-item"
+              >
+                <div class="paper-item__main">
+                  <div class="paper-item__topline">
+                    <h3 class="paper-item__title">{{ item.title }}</h3>
+                    <span v-if="item.badge" class="paper-item__badge">{{ item.badge }}</span>
                   </div>
-                  <strong class="book-item__price">{{ item.price }}</strong>
-                </article>
-              </div>
-            </article>
-          </div>
-
-          <div v-else :key="`spread-${currentSpreadIndex}`" class="book-spread-wrap">
-            <div class="book-spine" aria-hidden="true"></div>
-
-            <article class="book-page book-page--left">
-              <div class="book-page__paper"></div>
-              <div class="book-page__paper-grain"></div>
-              <div class="book-page__ornament book-page__ornament--top"></div>
-              <div class="book-page__ornament book-page__ornament--bottom"></div>
-
-              <header class="book-page__header">
-                <span class="book-page__kicker">{{ labels.menu }}</span>
-                <h2 class="book-page__title">{{ currentSpread.left.title }}</h2>
-                <div class="book-page__folio">{{ currentSpreadIndex * 2 + 1 }}</div>
-              </header>
-
-              <div class="book-list">
-                <article
-                  v-for="item in currentSpread.left.items"
-                  :key="`${currentSpread.left.id}-${item.title}-${item.price}`"
-                  class="book-item"
-                >
-                  <div class="book-item__copy">
-                    <div class="book-item__top">
-                      <h3 class="book-item__title">{{ item.title }}</h3>
-                      <span v-if="item.badge" class="book-item__badge">{{ item.badge }}</span>
-                    </div>
-                    <p class="book-item__desc">{{ item.desc }}</p>
-                  </div>
-                  <strong class="book-item__price">{{ item.price }}</strong>
-                </article>
-              </div>
-            </article>
-
-            <article class="book-page book-page--right">
-              <div class="book-page__paper"></div>
-              <div class="book-page__paper-grain"></div>
-              <div class="book-page__ornament book-page__ornament--top"></div>
-              <div class="book-page__ornament book-page__ornament--bottom"></div>
-
-              <header class="book-page__header">
-                <span class="book-page__kicker">{{ labels.menu }}</span>
-                <h2 class="book-page__title">{{ currentSpread.right.title }}</h2>
-                <div class="book-page__folio">{{ currentSpreadIndex * 2 + 2 }}</div>
-              </header>
-
-              <div class="book-list">
-                <article
-                  v-for="item in currentSpread.right.items"
-                  :key="`${currentSpread.right.id}-${item.title}-${item.price}`"
-                  class="book-item"
-                >
-                  <div class="book-item__copy">
-                    <div class="book-item__top">
-                      <h3 class="book-item__title">{{ item.title }}</h3>
-                      <span v-if="item.badge" class="book-item__badge">{{ item.badge }}</span>
-                    </div>
-                    <p class="book-item__desc">{{ item.desc }}</p>
-                  </div>
-                  <strong class="book-item__price">{{ item.price }}</strong>
-                </article>
-              </div>
-            </article>
-          </div>
-        </Transition>
+                  <p class="paper-item__desc">{{ item.desc }}</p>
+                </div>
+                <strong class="paper-item__price">{{ item.price }}</strong>
+              </article>
+            </div>
+          </article>
+        </div>
       </div>
-
-      <button
-        class="book-nav book-nav--next"
-        type="button"
-        :disabled="!canGoNext"
-        aria-label="Next"
-        @click="goNext"
-      >
-        <span>›</span>
-      </button>
-    </div>
+    </ClientOnly>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { menuSpreads } from '~/data/menu'
 
 type Locale = 'ar' | 'en'
@@ -177,9 +137,10 @@ type UiShape = {
     eyebrow: string
     title: string
     subtitle: string
-    hint: string
     sealTop: string
     sealBottom: string
+    backTop: string
+    backBottom: string
   }
 }
 
@@ -195,13 +156,18 @@ type MenuPage = {
   side: SwipeSide
 }
 
+type PageFlipInstance = {
+  destroy: () => void
+  loadFromHTML: (items: HTMLElement[] | NodeListOf<HTMLElement>) => void
+  updateFromHtml?: (items: HTMLElement[] | NodeListOf<HTMLElement>) => void
+}
+
 const locale = ref<Locale>('ar')
-const isMobile = ref(false)
-const bookOpened = ref(false)
-const currentSpreadIndex = ref(0)
-const mobilePageIndex = ref(0)
-const navDirection = ref<'next' | 'prev'>('next')
-const touchStartX = ref<number | null>(null)
+const bookRef = ref<HTMLElement | null>(null)
+const pagesRef = ref<HTMLElement | null>(null)
+const flipInstance = ref<PageFlipInstance | null>(null)
+const bookReady = ref(false)
+const fallbackMode = ref(false)
 
 const uiMap: Record<Locale, UiShape> = {
   ar: {
@@ -223,11 +189,12 @@ const uiMap: Record<Locale, UiShape> = {
     },
     cover: {
       eyebrow: 'قائمة طعام فاخرة',
-      title: 'دفتر المنيو',
-      subtitle: 'تجربة أنيقة تشبه الكتاب الحقيقي مع انتقالات سلسة وصفحات واضحة على الهاتف والحاسبة.',
-      hint: 'المس لفتح الغلاف',
+      title: 'Luxury Menu',
+      subtitle: 'اسحب الصفحة أو المس الحافة لتقليب دفتر المنيو بشكل واقعي.',
       sealTop: 'Premium',
-      sealBottom: 'Menu'
+      sealBottom: 'Dining',
+      backTop: 'شكراً لزيارتكم',
+      backBottom: 'نتمنى لكم تجربة مميزة'
     }
   },
   en: {
@@ -249,11 +216,12 @@ const uiMap: Record<Locale, UiShape> = {
     },
     cover: {
       eyebrow: 'Luxury Dining Collection',
-      title: 'Restaurant Menu',
-      subtitle: 'An elegant book-style experience with smooth realistic motion and balanced pages for every screen.',
-      hint: 'Tap to open the cover',
+      title: 'Luxury Menu',
+      subtitle: 'Drag the page or tap the edge to turn the menu like a real book.',
       sealTop: 'Premium',
-      sealBottom: 'Menu'
+      sealBottom: 'Dining',
+      backTop: 'Thank you for visiting',
+      backBottom: 'We wish you a memorable meal'
     }
   }
 }
@@ -261,10 +229,10 @@ const uiMap: Record<Locale, UiShape> = {
 const labels = computed(() => uiMap[locale.value])
 const coverLabels = computed(() => uiMap[locale.value].cover)
 
-const spreads = computed(() => {
+const localizedPages = computed<MenuPage[]>(() => {
   const ui = uiMap[locale.value]
 
-  return menuSpreads.map((spread, spreadIndex) => {
+  return menuSpreads.flatMap((spread, spreadIndex) => {
     const mapItems = (items: typeof spread.leftItems) =>
       items.map((item) => ({
         title: locale.value === 'ar' ? item.nameAr : item.nameEn,
@@ -273,129 +241,82 @@ const spreads = computed(() => {
         badge: item.badge ? ui.badges[item.badge as MenuBadge] : undefined
       }))
 
-    return {
-      left: {
+    return [
+      {
         id: `spread-${spreadIndex + 1}-left`,
         title: ui.sections[spread.leftTitleKey] ?? spread.leftTitleKey,
         items: mapItems(spread.leftItems),
         side: 'left' as SwipeSide
       },
-      right: {
+      {
         id: `spread-${spreadIndex + 1}-right`,
         title: ui.sections[spread.rightTitleKey] ?? spread.rightTitleKey,
         items: mapItems(spread.rightItems),
         side: 'right' as SwipeSide
       }
-    }
+    ]
   })
 })
 
-const mobilePages = computed<MenuPage[]>(() => spreads.value.flatMap((spread) => [spread.left, spread.right]))
-const currentSpread = computed(() => spreads.value[currentSpreadIndex.value] ?? spreads.value[0])
-const transitionName = computed(() => (navDirection.value === 'next' ? 'page-next' : 'page-prev'))
-
-const canGoPrev = computed(() => {
-  if (!bookOpened.value) return false
-  return isMobile.value ? mobilePageIndex.value > 0 : currentSpreadIndex.value > 0
-})
-
-const canGoNext = computed(() => {
-  if (!bookOpened.value) return true
-  if (isMobile.value) return mobilePageIndex.value < mobilePages.value.length - 1
-  return currentSpreadIndex.value < spreads.value.length - 1
-})
-
-function pageSideClass(side?: SwipeSide) {
-  return side === 'left' ? 'book-page--left' : 'book-page--right'
+async function destroyFlip() {
+  flipInstance.value?.destroy()
+  flipInstance.value = null
+  bookReady.value = false
+  if (bookRef.value) bookRef.value.innerHTML = ''
 }
 
-function syncResponsiveMode() {
+async function setupFlip() {
   if (typeof window === 'undefined') return
 
-  const nextIsMobile = window.innerWidth < 920
-  if (nextIsMobile === isMobile.value) return
+  await nextTick()
+  await destroyFlip()
 
-  if (bookOpened.value) {
-    if (nextIsMobile) {
-      mobilePageIndex.value = currentSpreadIndex.value * 2
-    } else {
-      currentSpreadIndex.value = Math.floor(mobilePageIndex.value / 2)
-    }
-  }
+  if (!bookRef.value || !pagesRef.value) return
 
-  isMobile.value = nextIsMobile
-}
+  try {
+    const mod = await import('page-flip')
+    const PageFlipCtor = mod.PageFlip
+    const pageNodes = Array.from(pagesRef.value.querySelectorAll<HTMLElement>('.menu-page'))
 
-function goNext() {
-  navDirection.value = 'next'
-
-  if (!bookOpened.value) {
-    bookOpened.value = true
-    return
-  }
-
-  if (!canGoNext.value) return
-
-  if (isMobile.value) {
-    mobilePageIndex.value += 1
-    return
-  }
-
-  currentSpreadIndex.value += 1
-}
-
-function goPrev() {
-  if (!bookOpened.value) return
-  navDirection.value = 'prev'
-
-  if (isMobile.value) {
-    if (mobilePageIndex.value === 0) {
-      bookOpened.value = false
+    if (!pageNodes.length) {
+      fallbackMode.value = true
       return
     }
-    mobilePageIndex.value -= 1
-    return
-  }
 
-  if (currentSpreadIndex.value === 0) {
-    bookOpened.value = false
-    return
-  }
+    fallbackMode.value = false
 
-  currentSpreadIndex.value -= 1
-}
+    const instance = new PageFlipCtor(bookRef.value, {
+      width: 430,
+      height: 620,
+      size: 'stretch',
+      minWidth: 260,
+      maxWidth: 520,
+      minHeight: 380,
+      maxHeight: 720,
+      maxShadowOpacity: 0.45,
+      showCover: true,
+      mobileScrollSupport: false,
+      useMouseEvents: true,
+      swipeDistance: 24,
+      clickEventForward: true,
+      usePortrait: true,
+      autoSize: true,
+      drawShadow: true,
+      startZIndex: 20,
+      flippingTime: 950,
+      startPage: 0
+    }) as PageFlipInstance
 
-function onTouchStart(event: TouchEvent) {
-  touchStartX.value = event.changedTouches[0]?.clientX ?? null
-}
-
-function onTouchEnd(event: TouchEvent) {
-  if (touchStartX.value === null) return
-
-  const endX = event.changedTouches[0]?.clientX ?? touchStartX.value
-  const delta = endX - touchStartX.value
-  touchStartX.value = null
-
-  if (Math.abs(delta) < 40) return
-
-  if (delta < 0) {
-    locale.value === 'ar' ? goPrev() : goNext()
-  } else {
-    locale.value === 'ar' ? goNext() : goPrev()
-  }
-}
-
-function onKeydown(event: KeyboardEvent) {
-  if (event.key === 'ArrowRight') {
-    locale.value === 'ar' ? goPrev() : goNext()
-  }
-
-  if (event.key === 'ArrowLeft') {
-    locale.value === 'ar' ? goNext() : goPrev()
+    instance.loadFromHTML(pageNodes)
+    flipInstance.value = instance
+    bookReady.value = true
+  } catch {
+    fallbackMode.value = true
+    bookReady.value = false
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   const params = new URLSearchParams(window.location.search)
   const queryLang = params.get('lang')
   const storedLang = localStorage.getItem('luxury-menu-locale')
@@ -410,14 +331,455 @@ onMounted(() => {
   document.documentElement.lang = locale.value
   document.documentElement.dir = locale.value === 'ar' ? 'rtl' : 'ltr'
 
-  syncResponsiveMode()
-  window.addEventListener('resize', syncResponsiveMode)
-  window.addEventListener('keydown', onKeydown)
+  await setupFlip()
+})
+
+watch(locale, async (value) => {
+  if (typeof window === 'undefined') return
+  localStorage.setItem('luxury-menu-locale', value)
+  document.documentElement.lang = value
+  document.documentElement.dir = value === 'ar' ? 'rtl' : 'ltr'
+  await setupFlip()
 })
 
 onBeforeUnmount(() => {
-  if (typeof window === 'undefined') return
-  window.removeEventListener('resize', syncResponsiveMode)
-  window.removeEventListener('keydown', onKeydown)
+  destroyFlip()
 })
 </script>
+
+<style scoped>
+.menu-book-screen {
+  min-height: 100vh;
+  padding: clamp(10px, 2.2vw, 26px);
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at top, rgba(198, 144, 39, 0.16), transparent 28%),
+    linear-gradient(180deg, #050608 0%, #06070b 100%);
+  overflow: hidden;
+}
+
+.menu-book-stage {
+  width: 100%;
+  display: grid;
+  place-items: center;
+}
+
+.menu-book-shell {
+  width: min(100%, 1140px);
+  position: relative;
+  display: grid;
+  place-items: center;
+  filter: drop-shadow(0 26px 52px rgba(0, 0, 0, 0.5));
+}
+
+.menu-book {
+  width: min(100%, 1020px);
+  margin: 0 auto;
+}
+
+.menu-book-pages-source {
+  position: absolute;
+  inset: -9999px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.menu-page {
+  background: transparent;
+}
+
+.cover-page,
+.back-page,
+.paper-page {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.cover-page {
+  background:
+    linear-gradient(135deg, rgba(23, 12, 7, 0.98) 0%, rgba(44, 24, 11, 0.98) 45%, rgba(14, 10, 10, 1) 100%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent);
+  border: 1px solid rgba(214, 172, 84, 0.18);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+    inset 0 0 70px rgba(0, 0, 0, 0.34),
+    0 14px 36px rgba(0, 0, 0, 0.4);
+}
+
+.cover-page__texture,
+.cover-page__shine,
+.cover-page__spine,
+.paper-page__grain,
+.paper-page__shadow,
+.paper-page__corner,
+.back-page::before {
+  position: absolute;
+  pointer-events: none;
+}
+
+.cover-page__texture {
+  inset: 0;
+  background:
+    radial-gradient(circle at 18% 20%, rgba(255, 219, 140, 0.08), transparent 22%),
+    radial-gradient(circle at 78% 18%, rgba(255, 219, 140, 0.06), transparent 16%),
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.015) 0,
+      rgba(255, 255, 255, 0.015) 1px,
+      transparent 1px,
+      transparent 6px
+    );
+}
+
+.cover-page__shine {
+  inset: 0;
+  background: linear-gradient(112deg, transparent 0%, rgba(255, 255, 255, 0.08) 26%, transparent 42%);
+  mix-blend-mode: screen;
+}
+
+.cover-page__spine {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 30px;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.36), rgba(255, 196, 84, 0.12), rgba(0, 0, 0, 0.28));
+}
+
+.cover-page__inner {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  padding: clamp(34px, 6vw, 64px) clamp(28px, 5vw, 52px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  text-align: center;
+}
+
+.cover-page__eyebrow {
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: rgba(241, 197, 96, 0.86);
+  font-size: 0.72rem;
+}
+
+.cover-page__title {
+  margin: 0;
+  color: #f7e9c6;
+  font-size: clamp(2rem, 5vw, 3.4rem);
+  line-height: 0.95;
+  font-weight: 800;
+}
+
+.cover-page__subtitle {
+  max-width: 28rem;
+  margin: 0;
+  color: rgba(243, 232, 214, 0.82);
+  line-height: 1.8;
+  font-size: clamp(0.96rem, 2vw, 1.08rem);
+}
+
+.cover-page__seal {
+  min-width: 120px;
+  padding: 14px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(231, 192, 105, 0.3);
+  background: rgba(0, 0, 0, 0.22);
+  color: #f0d389;
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  box-shadow: inset 0 0 16px rgba(255, 211, 132, 0.05);
+}
+
+.cover-page__seal span,
+.back-page__inner span {
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.cover-page__seal strong,
+.back-page__inner strong {
+  font-size: 1rem;
+  letter-spacing: 0.08em;
+}
+
+.back-page {
+  border: 1px solid rgba(198, 159, 90, 0.18);
+  background: linear-gradient(135deg, #170d09, #2a1d11 52%, #110c0b 100%);
+  box-shadow: inset 0 0 46px rgba(0, 0, 0, 0.28);
+}
+
+.back-page::before {
+  content: '';
+  inset: 0;
+  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.015) 0, rgba(255, 255, 255, 0.015) 1px, transparent 1px, transparent 6px);
+}
+
+.back-page__inner {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  color: #eed18f;
+  text-align: center;
+}
+
+.paper-page {
+  background: linear-gradient(180deg, #fcfaf2 0%, #f6f0e4 100%);
+  border: 1px solid rgba(192, 165, 124, 0.34);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.56),
+    inset 0 0 40px rgba(151, 124, 83, 0.08),
+    0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.paper-page__grain {
+  inset: 0;
+  background:
+    radial-gradient(circle at top right, rgba(190, 150, 96, 0.06), transparent 18%),
+    repeating-linear-gradient(0deg, rgba(107, 87, 52, 0.024) 0, rgba(107, 87, 52, 0.024) 1px, transparent 1px, transparent 7px);
+  opacity: 0.7;
+}
+
+.paper-page__shadow {
+  top: 0;
+  bottom: 0;
+  width: 13%;
+  opacity: 0.32;
+}
+
+.menu-page--left .paper-page__shadow {
+  right: 0;
+  background: linear-gradient(90deg, transparent, rgba(102, 78, 39, 0.14), rgba(46, 28, 15, 0.12));
+}
+
+.menu-page--right .paper-page__shadow {
+  left: 0;
+  background: linear-gradient(90deg, rgba(46, 28, 15, 0.12), rgba(102, 78, 39, 0.14), transparent);
+}
+
+.paper-page__corner {
+  width: 92px;
+  height: 92px;
+  border: 1px solid rgba(213, 182, 126, 0.22);
+  opacity: 0.55;
+}
+
+.paper-page__corner--top {
+  top: -42px;
+  right: -42px;
+  border-radius: 50%;
+}
+
+.paper-page__corner--bottom {
+  bottom: -54px;
+  left: -54px;
+  border-radius: 50%;
+}
+
+.paper-page__header {
+  position: relative;
+  z-index: 1;
+  padding: clamp(26px, 4vw, 34px) clamp(20px, 4vw, 34px) 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.paper-page__kicker {
+  color: #c89526;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.paper-page__title {
+  margin: 0;
+  color: #120c08;
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.paper-page__folio {
+  position: absolute;
+  inset-inline-end: clamp(20px, 4vw, 34px);
+  top: clamp(24px, 4vw, 32px);
+  color: rgba(124, 92, 42, 0.62);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.paper-list {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 0;
+  padding: 4px clamp(18px, 4vw, 32px) clamp(22px, 4vw, 30px);
+}
+
+.paper-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: start;
+  padding: 18px 0;
+  border-bottom: 1px dashed rgba(176, 148, 106, 0.2);
+}
+
+.paper-item:last-child {
+  border-bottom: 0;
+}
+
+.paper-item__topline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.paper-item__title {
+  margin: 0;
+  color: #140e0a;
+  font-size: clamp(1.05rem, 2.2vw, 1.52rem);
+  font-weight: 800;
+}
+
+.paper-item__desc {
+  margin: 8px 0 0;
+  color: #816b4f;
+  line-height: 1.7;
+  font-size: clamp(0.9rem, 1.9vw, 1.02rem);
+}
+
+.paper-item__badge {
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(205, 171, 104, 0.3);
+  color: #bb8d2f;
+  background: rgba(232, 219, 186, 0.48);
+  font-size: 0.73rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.paper-item__price {
+  align-self: center;
+  min-width: 96px;
+  padding: 10px 16px;
+  border-radius: 18px;
+  background: rgba(255, 251, 243, 0.84);
+  border: 1px solid rgba(223, 205, 171, 0.8);
+  text-align: center;
+  color: #130d09;
+  font-size: clamp(1.1rem, 2vw, 1.45rem);
+  font-weight: 900;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+.menu-fallback-list {
+  width: min(100%, 880px);
+  display: grid;
+  gap: 16px;
+}
+
+.cover-page--fallback,
+.paper-page--fallback {
+  min-height: 540px;
+}
+
+:deep(.stf__parent) {
+  margin: 0 auto;
+}
+
+:deep(.stf__wrapper) {
+  margin: 0 auto;
+}
+
+:deep(.stf__block) {
+  border-radius: 24px;
+}
+
+:deep(.stf__item) {
+  overflow: visible !important;
+}
+
+:deep(.stf__itemShadow) {
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.34), rgba(0, 0, 0, 0.04)) !important;
+}
+
+:deep(.stf__outerShadow) {
+  background: radial-gradient(circle, rgba(0, 0, 0, 0.2), transparent 70%) !important;
+}
+
+@media (max-width: 920px) {
+  .menu-book-screen {
+    padding: 8px;
+  }
+
+  .menu-book-shell {
+    width: 100%;
+  }
+
+  .menu-book {
+    width: min(100%, 760px);
+  }
+
+  .paper-page__title {
+    font-size: clamp(1.75rem, 6vw, 2.55rem);
+  }
+
+  .paper-item {
+    gap: 12px;
+  }
+
+  .paper-item__price {
+    min-width: 76px;
+    padding: 8px 12px;
+  }
+}
+
+@media (max-width: 640px) {
+  .menu-book-screen {
+    padding: 6px;
+  }
+
+  .cover-page__inner {
+    padding: 28px 20px;
+  }
+
+  .paper-page__header {
+    padding: 22px 18px 10px;
+  }
+
+  .paper-list {
+    padding: 0 16px 18px;
+  }
+
+  .paper-item {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding: 14px 0;
+  }
+
+  .paper-item__price {
+    justify-self: start;
+    min-width: 68px;
+  }
+
+  .cover-page--fallback,
+  .paper-page--fallback {
+    min-height: 440px;
+  }
+}
+</style>
