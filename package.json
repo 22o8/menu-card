@@ -9,10 +9,10 @@
   },
   "dependencies": {
     "nuxt": "^3.17.5",
-    "page-flip": "^2.0.7",
-    "vue": "^3.5.13"
+    "vue": "^3.5.13",
+    "page-flip": "^2.0.7"
   },
   "engines": {
-    "node": ">=20 <23"
+    "node": ">=20"
   }
 }
