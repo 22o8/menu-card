@@ -1,9 +1,29 @@
 <template>
   <section class="menu-book-screen" :dir="locale === 'ar' ? 'rtl' : 'ltr'">
     <ClientOnly>
-      <div class="menu-book-stage" :class="{ 'is-ready': bookReady, 'is-fallback': fallbackMode }">
-        <div class="menu-book-shell">
-          <div ref="bookRef" class="menu-book"></div>
+      <div class="menu-book-stage">
+        <div class="menu-book-shell" :class="{ 'is-ready': bookReady }">
+          <button
+            class="book-arrow book-arrow--prev"
+            type="button"
+            :aria-label="labels.prev"
+            @click="prevPage"
+          >
+            <span>‹</span>
+          </button>
+
+          <div class="menu-book-center">
+            <div ref="bookRef" class="menu-book"></div>
+          </div>
+
+          <button
+            class="book-arrow book-arrow--next"
+            type="button"
+            :aria-label="labels.next"
+            @click="nextPage"
+          >
+            <span>›</span>
+          </button>
         </div>
 
         <div ref="pagesRef" class="menu-book-pages-source" aria-hidden="true">
@@ -11,16 +31,13 @@
             <div class="cover-page">
               <div class="cover-page__texture"></div>
               <div class="cover-page__shine"></div>
+              <div class="cover-page__spine"></div>
+              <div class="cover-page__edge"></div>
               <div class="cover-page__inner">
                 <span class="cover-page__eyebrow">{{ coverLabels.eyebrow }}</span>
                 <h1 class="cover-page__title">{{ coverLabels.title }}</h1>
                 <p class="cover-page__subtitle">{{ coverLabels.subtitle }}</p>
-                <div class="cover-page__seal">
-                  <span>{{ coverLabels.sealTop }}</span>
-                  <strong>{{ coverLabels.sealBottom }}</strong>
-                </div>
               </div>
-              <div class="cover-page__spine"></div>
             </div>
           </article>
 
@@ -32,7 +49,7 @@
           >
             <div class="paper-page">
               <div class="paper-page__grain"></div>
-              <div class="paper-page__shadow"></div>
+              <div class="paper-page__fold"></div>
               <div class="paper-page__corner paper-page__corner--top"></div>
               <div class="paper-page__corner paper-page__corner--bottom"></div>
 
@@ -71,48 +88,16 @@
           </article>
         </div>
 
-        <div v-if="fallbackMode" class="menu-fallback-list">
+        <div v-if="fallbackMode" class="menu-fallback-shell">
           <article class="cover-page cover-page--fallback">
             <div class="cover-page__texture"></div>
             <div class="cover-page__shine"></div>
+            <div class="cover-page__spine"></div>
+            <div class="cover-page__edge"></div>
             <div class="cover-page__inner">
               <span class="cover-page__eyebrow">{{ coverLabels.eyebrow }}</span>
               <h1 class="cover-page__title">{{ coverLabels.title }}</h1>
               <p class="cover-page__subtitle">{{ coverLabels.subtitle }}</p>
-              <div class="cover-page__seal">
-                <span>{{ coverLabels.sealTop }}</span>
-                <strong>{{ coverLabels.sealBottom }}</strong>
-              </div>
-            </div>
-            <div class="cover-page__spine"></div>
-          </article>
-
-          <article
-            v-for="(page, index) in localizedPages"
-            :key="`fallback-${page.id}`"
-            class="paper-page paper-page--fallback"
-          >
-            <header class="paper-page__header">
-              <span class="paper-page__kicker">{{ labels.menu }}</span>
-              <h2 class="paper-page__title">{{ page.title }}</h2>
-              <span class="paper-page__folio">{{ index + 1 }}</span>
-            </header>
-
-            <div class="paper-list">
-              <article
-                v-for="item in page.items"
-                :key="`fallback-${page.id}-${item.title}-${item.price}`"
-                class="paper-item"
-              >
-                <div class="paper-item__main">
-                  <div class="paper-item__topline">
-                    <h3 class="paper-item__title">{{ item.title }}</h3>
-                    <span v-if="item.badge" class="paper-item__badge">{{ item.badge }}</span>
-                  </div>
-                  <p class="paper-item__desc">{{ item.desc }}</p>
-                </div>
-                <strong class="paper-item__price">{{ item.price }}</strong>
-              </article>
             </div>
           </article>
         </div>
@@ -131,14 +116,14 @@ type SwipeSide = 'left' | 'right'
 
 type UiShape = {
   menu: string
+  prev: string
+  next: string
   badges: Record<MenuBadge, string>
   sections: Record<string, string>
   cover: {
     eyebrow: string
     title: string
     subtitle: string
-    sealTop: string
-    sealBottom: string
     backTop: string
     backBottom: string
   }
@@ -160,6 +145,10 @@ type PageFlipInstance = {
   destroy: () => void
   loadFromHTML: (items: HTMLElement[] | NodeListOf<HTMLElement>) => void
   updateFromHtml?: (items: HTMLElement[] | NodeListOf<HTMLElement>) => void
+  flipNext?: (corner?: 'top' | 'bottom') => void
+  flipPrev?: (corner?: 'top' | 'bottom') => void
+  turnToNextPage?: () => void
+  turnToPrevPage?: () => void
 }
 
 const locale = ref<Locale>('ar')
@@ -172,6 +161,8 @@ const fallbackMode = ref(false)
 const uiMap: Record<Locale, UiShape> = {
   ar: {
     menu: 'المنيو',
+    prev: 'الصفحة السابقة',
+    next: 'الصفحة التالية',
     badges: {
       chef: 'اختيار الشيف',
       spicy: 'حار',
@@ -190,15 +181,15 @@ const uiMap: Record<Locale, UiShape> = {
     cover: {
       eyebrow: 'قائمة طعام فاخرة',
       title: 'Luxury Menu',
-      subtitle: 'اسحب الصفحة أو المس الحافة لتقليب دفتر المنيو بشكل واقعي.',
-      sealTop: 'Premium',
-      sealBottom: 'Dining',
+      subtitle: 'اسحب الصفحة أو استخدم الأسهم لتقليب المنيو بإحساس كتاب حقيقي.',
       backTop: 'شكراً لزيارتكم',
       backBottom: 'نتمنى لكم تجربة مميزة'
     }
   },
   en: {
     menu: 'MENU',
+    prev: 'Previous page',
+    next: 'Next page',
     badges: {
       chef: 'Chef Choice',
       spicy: 'Spicy',
@@ -217,9 +208,7 @@ const uiMap: Record<Locale, UiShape> = {
     cover: {
       eyebrow: 'Luxury Dining Collection',
       title: 'Luxury Menu',
-      subtitle: 'Drag the page or tap the edge to turn the menu like a real book.',
-      sealTop: 'Premium',
-      sealBottom: 'Dining',
+      subtitle: 'Drag the page or use the arrows to turn the menu like a real book.',
       backTop: 'Thank you for visiting',
       backBottom: 'We wish you a memorable meal'
     }
@@ -258,6 +247,11 @@ const localizedPages = computed<MenuPage[]>(() => {
   })
 })
 
+function updateDocumentLang(value: Locale) {
+  document.documentElement.lang = value
+  document.documentElement.dir = value === 'ar' ? 'rtl' : 'ltr'
+}
+
 async function destroyFlip() {
   flipInstance.value?.destroy()
   flipInstance.value = null
@@ -286,33 +280,62 @@ async function setupFlip() {
     fallbackMode.value = false
 
     const instance = new PageFlipCtor(bookRef.value, {
-      width: 430,
+      width: 420,
       height: 620,
       size: 'stretch',
-      minWidth: 260,
-      maxWidth: 520,
-      minHeight: 380,
-      maxHeight: 720,
-      maxShadowOpacity: 0.45,
+      minWidth: 250,
+      maxWidth: 470,
+      minHeight: 360,
+      maxHeight: 690,
       showCover: true,
+      usePortrait: true,
+      autoSize: false,
+      maxShadowOpacity: 0.45,
       mobileScrollSupport: false,
       useMouseEvents: true,
-      swipeDistance: 24,
+      swipeDistance: 18,
       clickEventForward: true,
-      usePortrait: true,
-      autoSize: true,
       drawShadow: true,
-      startZIndex: 20,
-      flippingTime: 950,
-      startPage: 0
+      startZIndex: 10,
+      flippingTime: 900
     }) as PageFlipInstance
 
     instance.loadFromHTML(pageNodes)
     flipInstance.value = instance
     bookReady.value = true
-  } catch {
+  } catch (error) {
+    console.error(error)
     fallbackMode.value = true
     bookReady.value = false
+  }
+}
+
+function nextPage() {
+  const instance = flipInstance.value
+  if (!instance) return
+  if (typeof instance.flipNext === 'function') {
+    instance.flipNext('top')
+    return
+  }
+  instance.turnToNextPage?.()
+}
+
+function prevPage() {
+  const instance = flipInstance.value
+  if (!instance) return
+  if (typeof instance.flipPrev === 'function') {
+    instance.flipPrev('top')
+    return
+  }
+  instance.turnToPrevPage?.()
+}
+
+function onKeydown(event: KeyboardEvent) {
+  if (event.key === 'ArrowRight') {
+    locale.value === 'ar' ? prevPage() : nextPage()
+  }
+  if (event.key === 'ArrowLeft') {
+    locale.value === 'ar' ? nextPage() : prevPage()
   }
 }
 
@@ -328,21 +351,20 @@ onMounted(async () => {
 
   locale.value = nextLang as Locale
   localStorage.setItem('luxury-menu-locale', locale.value)
-  document.documentElement.lang = locale.value
-  document.documentElement.dir = locale.value === 'ar' ? 'rtl' : 'ltr'
-
+  updateDocumentLang(locale.value)
+  window.addEventListener('keydown', onKeydown)
   await setupFlip()
 })
 
 watch(locale, async (value) => {
   if (typeof window === 'undefined') return
   localStorage.setItem('luxury-menu-locale', value)
-  document.documentElement.lang = value
-  document.documentElement.dir = value === 'ar' ? 'rtl' : 'ltr'
+  updateDocumentLang(value)
   await setupFlip()
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown)
   destroyFlip()
 })
 </script>
@@ -350,37 +372,59 @@ onBeforeUnmount(() => {
 <style scoped>
 .menu-book-screen {
   min-height: 100vh;
-  padding: clamp(10px, 2.2vw, 26px);
+  min-height: 100svh;
+  height: 100vh;
+  height: 100svh;
+  padding: clamp(10px, 1.6vw, 20px);
   display: grid;
   place-items: center;
-  background:
-    radial-gradient(circle at top, rgba(198, 144, 39, 0.16), transparent 28%),
-    linear-gradient(180deg, #050608 0%, #06070b 100%);
   overflow: hidden;
+  background:
+    radial-gradient(circle at top center, rgba(200, 145, 41, 0.16), transparent 22%),
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.035), transparent 34%),
+    linear-gradient(180deg, #0d0b0a 0%, #060608 100%);
 }
 
 .menu-book-stage {
-  width: 100%;
+  width: min(100%, 1360px);
+  height: 100%;
   display: grid;
   place-items: center;
 }
 
 .menu-book-shell {
-  width: min(100%, 1140px);
   position: relative;
-  display: grid;
-  place-items: center;
-  filter: drop-shadow(0 26px 52px rgba(0, 0, 0, 0.5));
+  width: 100%;
+  height: min(100%, 920px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.menu-book-center {
+  width: min(100%, 1120px);
+  height: min(100%, 820px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
 }
 
 .menu-book {
-  width: min(100%, 1020px);
-  margin: 0 auto;
+  width: min(100%, 1040px);
+  height: min(100%, 820px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  filter: drop-shadow(0 34px 80px rgba(0, 0, 0, 0.52));
 }
 
 .menu-book-pages-source {
   position: absolute;
-  inset: -9999px;
+  width: 0;
+  height: 0;
+  overflow: hidden;
   opacity: 0;
   pointer-events: none;
 }
@@ -395,26 +439,27 @@ onBeforeUnmount(() => {
   position: relative;
   width: 100%;
   height: 100%;
-  border-radius: 18px;
+  border-radius: 20px;
   overflow: hidden;
 }
 
 .cover-page {
   background:
-    linear-gradient(135deg, rgba(23, 12, 7, 0.98) 0%, rgba(44, 24, 11, 0.98) 45%, rgba(14, 10, 10, 1) 100%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent);
+    linear-gradient(90deg, rgba(0, 0, 0, 0.34), rgba(255, 211, 128, 0.08) 10%, rgba(34, 17, 9, 0.82) 22%, rgba(70, 34, 13, 0.96) 52%, rgba(16, 9, 7, 0.98) 100%),
+    linear-gradient(180deg, rgba(255,255,255,0.04), transparent 26%);
   border: 1px solid rgba(214, 172, 84, 0.18);
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.03),
-    inset 0 0 70px rgba(0, 0, 0, 0.34),
-    0 14px 36px rgba(0, 0, 0, 0.4);
+    inset 0 0 0 1px rgba(255,255,255,0.03),
+    inset -18px 0 30px rgba(0,0,0,0.36),
+    inset 0 0 80px rgba(0,0,0,0.24);
 }
 
 .cover-page__texture,
 .cover-page__shine,
 .cover-page__spine,
+.cover-page__edge,
 .paper-page__grain,
-.paper-page__shadow,
+.paper-page__fold,
 .paper-page__corner,
 .back-page::before {
   position: absolute;
@@ -424,20 +469,13 @@ onBeforeUnmount(() => {
 .cover-page__texture {
   inset: 0;
   background:
-    radial-gradient(circle at 18% 20%, rgba(255, 219, 140, 0.08), transparent 22%),
-    radial-gradient(circle at 78% 18%, rgba(255, 219, 140, 0.06), transparent 16%),
-    repeating-linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.015) 0,
-      rgba(255, 255, 255, 0.015) 1px,
-      transparent 1px,
-      transparent 6px
-    );
+    radial-gradient(circle at 18% 18%, rgba(255, 222, 155, 0.09), transparent 18%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.014) 0, rgba(255,255,255,0.014) 1px, transparent 1px, transparent 5px);
 }
 
 .cover-page__shine {
   inset: 0;
-  background: linear-gradient(112deg, transparent 0%, rgba(255, 255, 255, 0.08) 26%, transparent 42%);
+  background: linear-gradient(112deg, transparent 0%, rgba(255,255,255,0.08) 24%, transparent 42%);
   mix-blend-mode: screen;
 }
 
@@ -445,70 +483,56 @@ onBeforeUnmount(() => {
   top: 0;
   bottom: 0;
   left: 0;
-  width: 30px;
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0.36), rgba(255, 196, 84, 0.12), rgba(0, 0, 0, 0.28));
+  width: 34px;
+  background: linear-gradient(90deg, rgba(0,0,0,0.42), rgba(255, 205, 120, 0.14), rgba(0,0,0,0.28));
 }
 
-.cover-page__inner {
+.cover-page__edge {
+  top: 14px;
+  right: 0;
+  bottom: 14px;
+  width: 18px;
+  border-radius: 14px 0 0 14px;
+  background: linear-gradient(180deg, rgba(255, 216, 146, 0.5), rgba(111, 70, 18, 0.6), rgba(255, 216, 146, 0.4));
+}
+
+.cover-page__inner,
+.back-page__inner {
   position: relative;
   z-index: 1;
   height: 100%;
-  padding: clamp(34px, 6vw, 64px) clamp(28px, 5vw, 52px);
+  padding: clamp(34px, 5vw, 62px);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 20px;
+  gap: 18px;
   text-align: center;
 }
 
-.cover-page__eyebrow {
-  letter-spacing: 0.34em;
+.cover-page__eyebrow,
+.back-page__inner span {
+  letter-spacing: 0.32em;
   text-transform: uppercase;
-  color: rgba(241, 197, 96, 0.86);
-  font-size: 0.72rem;
+  color: rgba(241, 197, 96, 0.88);
+  font-size: 0.76rem;
 }
 
 .cover-page__title {
   margin: 0;
   color: #f7e9c6;
-  font-size: clamp(2rem, 5vw, 3.4rem);
-  line-height: 0.95;
+  font-size: clamp(2.2rem, 5.6vw, 4.2rem);
+  line-height: 0.96;
   font-weight: 800;
 }
 
-.cover-page__subtitle {
-  max-width: 28rem;
-  margin: 0;
-  color: rgba(243, 232, 214, 0.82);
-  line-height: 1.8;
-  font-size: clamp(0.96rem, 2vw, 1.08rem);
-}
-
-.cover-page__seal {
-  min-width: 120px;
-  padding: 14px 18px;
-  border-radius: 999px;
-  border: 1px solid rgba(231, 192, 105, 0.3);
-  background: rgba(0, 0, 0, 0.22);
-  color: #f0d389;
-  display: grid;
-  gap: 6px;
-  justify-items: center;
-  box-shadow: inset 0 0 16px rgba(255, 211, 132, 0.05);
-}
-
-.cover-page__seal span,
-.back-page__inner span {
-  font-size: 0.72rem;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-}
-
-.cover-page__seal strong,
+.cover-page__subtitle,
 .back-page__inner strong {
-  font-size: 1rem;
-  letter-spacing: 0.08em;
+  margin: 0;
+  max-width: 30rem;
+  color: rgba(243, 232, 214, 0.84);
+  line-height: 1.8;
+  font-size: clamp(0.98rem, 2vw, 1.12rem);
 }
 
 .back-page {
@@ -518,127 +542,109 @@ onBeforeUnmount(() => {
 }
 
 .back-page::before {
-  content: '';
   inset: 0;
-  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.015) 0, rgba(255, 255, 255, 0.015) 1px, transparent 1px, transparent 6px);
-}
-
-.back-page__inner {
-  position: relative;
-  z-index: 1;
-  height: 100%;
-  display: grid;
-  place-content: center;
-  gap: 8px;
-  color: #eed18f;
-  text-align: center;
+  background: linear-gradient(112deg, transparent, rgba(255,255,255,0.06) 36%, transparent 58%);
 }
 
 .paper-page {
-  background: linear-gradient(180deg, #fcfaf2 0%, #f6f0e4 100%);
-  border: 1px solid rgba(192, 165, 124, 0.34);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.56),
-    inset 0 0 40px rgba(151, 124, 83, 0.08),
-    0 8px 24px rgba(0, 0, 0, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.48), rgba(255,255,255,0) 12%),
+    linear-gradient(90deg, #f7f1e6 0%, #f0e8db 48%, #ede2d1 100%);
+  border: 1px solid rgba(164, 138, 94, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.22);
+  color: #17120d;
 }
 
 .paper-page__grain {
   inset: 0;
   background:
-    radial-gradient(circle at top right, rgba(190, 150, 96, 0.06), transparent 18%),
-    repeating-linear-gradient(0deg, rgba(107, 87, 52, 0.024) 0, rgba(107, 87, 52, 0.024) 1px, transparent 1px, transparent 7px);
-  opacity: 0.7;
+    radial-gradient(circle at 20% 20%, rgba(134, 103, 46, 0.05), transparent 18%),
+    radial-gradient(circle at 80% 30%, rgba(134, 103, 46, 0.03), transparent 14%),
+    repeating-linear-gradient(180deg, rgba(70, 47, 21, 0.018) 0, rgba(70, 47, 21, 0.018) 1px, transparent 1px, transparent 34px);
 }
 
-.paper-page__shadow {
+.paper-page__fold {
   top: 0;
   bottom: 0;
-  width: 13%;
-  opacity: 0.32;
+  width: 16%;
+  background: linear-gradient(90deg, rgba(255,255,255,0.34), rgba(143, 116, 70, 0.07), transparent 72%);
 }
 
-.menu-page--left .paper-page__shadow {
+.menu-page--left .paper-page__fold {
   right: 0;
-  background: linear-gradient(90deg, transparent, rgba(102, 78, 39, 0.14), rgba(46, 28, 15, 0.12));
 }
 
-.menu-page--right .paper-page__shadow {
+.menu-page--right .paper-page__fold {
   left: 0;
-  background: linear-gradient(90deg, rgba(46, 28, 15, 0.12), rgba(102, 78, 39, 0.14), transparent);
+  transform: scaleX(-1);
 }
 
-.paper-page__corner {
-  width: 92px;
-  height: 92px;
-  border: 1px solid rgba(213, 182, 126, 0.22);
-  opacity: 0.55;
+.paper-page__corner--top,
+.paper-page__corner--bottom {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 1px solid rgba(193, 157, 95, 0.16);
 }
 
 .paper-page__corner--top {
-  top: -42px;
-  right: -42px;
-  border-radius: 50%;
+  top: -70px;
+  right: -70px;
 }
 
 .paper-page__corner--bottom {
-  bottom: -54px;
-  left: -54px;
-  border-radius: 50%;
+  bottom: -78px;
+  left: -78px;
 }
 
 .paper-page__header {
   position: relative;
   z-index: 1;
-  padding: clamp(26px, 4vw, 34px) clamp(20px, 4vw, 34px) 12px;
-  display: grid;
-  gap: 8px;
+  padding: 28px 32px 16px;
 }
 
 .paper-page__kicker {
-  color: #c89526;
-  letter-spacing: 0.26em;
-  text-transform: uppercase;
-  font-size: 0.72rem;
+  display: inline-block;
+  font-size: 0.78rem;
   font-weight: 800;
+  letter-spacing: 0.24em;
+  color: #c2932f;
+  text-transform: uppercase;
 }
 
 .paper-page__title {
-  margin: 0;
-  color: #120c08;
-  font-size: clamp(2rem, 4vw, 3rem);
-  font-weight: 800;
-  line-height: 1;
+  margin: 10px 0 0;
+  font-size: clamp(2rem, 4vw, 3.35rem);
+  line-height: 0.98;
+  font-weight: 900;
 }
 
 .paper-page__folio {
   position: absolute;
-  inset-inline-end: clamp(20px, 4vw, 34px);
-  top: clamp(24px, 4vw, 32px);
-  color: rgba(124, 92, 42, 0.62);
-  font-size: 0.9rem;
+  top: 28px;
+  right: 32px;
+  font-size: 1rem;
+  color: rgba(183, 141, 66, 0.9);
   font-weight: 700;
 }
 
 .paper-list {
   position: relative;
   z-index: 1;
-  display: grid;
-  gap: 0;
-  padding: 4px clamp(18px, 4vw, 32px) clamp(22px, 4vw, 30px);
+  padding: 0 32px 30px;
 }
 
 .paper-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 18px;
+  gap: 16px;
   align-items: start;
   padding: 18px 0;
-  border-bottom: 1px dashed rgba(176, 148, 106, 0.2);
+  border-top: 1px dashed rgba(115, 84, 42, 0.12);
 }
 
-.paper-item:last-child {
-  border-bottom: 0;
+.paper-item:first-child {
+  border-top: 0;
 }
 
 .paper-item__topline {
@@ -650,136 +656,164 @@ onBeforeUnmount(() => {
 
 .paper-item__title {
   margin: 0;
-  color: #140e0a;
-  font-size: clamp(1.05rem, 2.2vw, 1.52rem);
+  font-size: clamp(1.25rem, 2.4vw, 1.8rem);
+  line-height: 1.15;
+}
+
+.paper-item__badge {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(194, 145, 52, 0.2);
+  background: rgba(204, 158, 71, 0.08);
+  color: #c38e28;
+  font-size: 0.78rem;
   font-weight: 800;
 }
 
 .paper-item__desc {
-  margin: 8px 0 0;
-  color: #816b4f;
-  line-height: 1.7;
-  font-size: clamp(0.9rem, 1.9vw, 1.02rem);
-}
-
-.paper-item__badge {
-  padding: 5px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(205, 171, 104, 0.3);
-  color: #bb8d2f;
-  background: rgba(232, 219, 186, 0.48);
-  font-size: 0.73rem;
-  font-weight: 700;
-  white-space: nowrap;
+  margin: 10px 0 0;
+  color: #7c6e5c;
+  line-height: 1.65;
+  font-size: clamp(0.95rem, 1.3vw, 1.04rem);
 }
 
 .paper-item__price {
-  align-self: center;
-  min-width: 96px;
-  padding: 10px 16px;
-  border-radius: 18px;
-  background: rgba(255, 251, 243, 0.84);
-  border: 1px solid rgba(223, 205, 171, 0.8);
+  min-width: 88px;
+  padding: 12px 16px;
+  border-radius: 20px;
   text-align: center;
-  color: #130d09;
-  font-size: clamp(1.1rem, 2vw, 1.45rem);
-  font-weight: 900;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  background: rgba(255, 250, 240, 0.7);
+  border: 1px solid rgba(208, 178, 130, 0.28);
+  box-shadow: 0 8px 20px rgba(151, 123, 70, 0.08);
+  font-size: clamp(1.25rem, 2vw, 1.8rem);
+  line-height: 1;
 }
 
-.menu-fallback-list {
-  width: min(100%, 880px);
+.book-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 30;
+  width: clamp(48px, 4vw, 64px);
+  height: clamp(48px, 4vw, 64px);
+  border: 1px solid rgba(229, 201, 137, 0.18);
+  border-radius: 999px;
   display: grid;
-  gap: 16px;
+  place-items: center;
+  background: rgba(13, 13, 16, 0.55);
+  color: #f5e3ba;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 18px 34px rgba(0, 0, 0, 0.26);
+  cursor: pointer;
+  transition: transform 0.22s ease, background 0.22s ease, border-color 0.22s ease;
 }
 
-.cover-page--fallback,
-.paper-page--fallback {
-  min-height: 540px;
+.book-arrow:hover {
+  transform: translateY(-50%) scale(1.05);
+  background: rgba(28, 22, 15, 0.88);
+  border-color: rgba(229, 201, 137, 0.3);
 }
 
-:deep(.stf__parent) {
+.book-arrow span {
+  font-size: clamp(1.8rem, 2.6vw, 2.4rem);
+  line-height: 1;
+  transform: translateY(-1px);
+}
+
+.book-arrow--prev {
+  left: clamp(8px, 1.6vw, 22px);
+}
+
+.book-arrow--next {
+  right: clamp(8px, 1.6vw, 22px);
+}
+
+.menu-fallback-shell {
+  width: min(100%, 450px);
+  height: min(72vh, 640px);
+}
+
+.cover-page--fallback {
+  height: 100%;
+}
+
+.menu-book :deep(.stf__parent) {
   margin: 0 auto;
 }
 
-:deep(.stf__wrapper) {
+.menu-book :deep(.stf__wrapper) {
   margin: 0 auto;
 }
 
-:deep(.stf__block) {
-  border-radius: 24px;
+.menu-book :deep(.stf__block) {
+  overflow: visible;
 }
 
-:deep(.stf__item) {
-  overflow: visible !important;
-}
-
-:deep(.stf__itemShadow) {
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0.34), rgba(0, 0, 0, 0.04)) !important;
-}
-
-:deep(.stf__outerShadow) {
-  background: radial-gradient(circle, rgba(0, 0, 0, 0.2), transparent 70%) !important;
+.menu-book :deep(.stf__item) {
+  border-radius: 20px;
 }
 
 @media (max-width: 920px) {
+  .menu-book-shell {
+    height: min(100%, 760px);
+  }
+
+  .menu-book-center,
+  .menu-book {
+    width: min(100%, 760px);
+    height: min(100%, 720px);
+  }
+
+  .book-arrow {
+    width: 52px;
+    height: 52px;
+  }
+}
+
+@media (max-width: 720px) {
   .menu-book-screen {
-    padding: 8px;
+    padding: 10px;
   }
 
   .menu-book-shell {
-    width: 100%;
+    height: 100%;
   }
 
+  .menu-book-center,
   .menu-book {
-    width: min(100%, 760px);
+    width: 100%;
+    height: min(100%, 700px);
   }
 
-  .paper-page__title {
-    font-size: clamp(1.75rem, 6vw, 2.55rem);
+  .book-arrow {
+    width: 46px;
+    height: 46px;
+    background: rgba(13, 13, 16, 0.66);
+  }
+
+  .book-arrow--prev {
+    left: 2px;
+  }
+
+  .book-arrow--next {
+    right: 2px;
+  }
+
+  .paper-page__header {
+    padding: 22px 22px 12px;
+  }
+
+  .paper-list {
+    padding: 0 22px 22px;
   }
 
   .paper-item {
+    grid-template-columns: 1fr;
     gap: 12px;
   }
 
   .paper-item__price {
-    min-width: 76px;
-    padding: 8px 12px;
-  }
-}
-
-@media (max-width: 640px) {
-  .menu-book-screen {
-    padding: 6px;
-  }
-
-  .cover-page__inner {
-    padding: 28px 20px;
-  }
-
-  .paper-page__header {
-    padding: 22px 18px 10px;
-  }
-
-  .paper-list {
-    padding: 0 16px 18px;
-  }
-
-  .paper-item {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 10px;
-    padding: 14px 0;
-  }
-
-  .paper-item__price {
     justify-self: start;
-    min-width: 68px;
-  }
-
-  .cover-page--fallback,
-  .paper-page--fallback {
-    min-height: 440px;
   }
 }
 </style>
