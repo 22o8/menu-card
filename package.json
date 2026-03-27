@@ -3,9 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "npx nuxt dev",
-    "build": "npx nuxt build",
-    "preview": "npx nuxt preview"
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "preview": "nuxt preview"
   },
   "dependencies": {
     "nuxt": "^3.17.5",
