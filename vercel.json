@@ -1,5 +1,4 @@
 {
   "installCommand": "npm install",
-  "buildCommand": "node ./node_modules/nuxt/bin/nuxt.mjs build",
-  "outputDirectory": ".output/public"
+  "buildCommand": "node ./node_modules/nuxt/bin/nuxt.mjs build"
 }
