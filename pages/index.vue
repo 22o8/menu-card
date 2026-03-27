@@ -1,6 +1,6 @@
 <script setup lang="ts">
 useHead({
-  title: 'Luxury Menu Card'
+  title: 'Luxury Restaurant Menu'
 })
 </script>
 
