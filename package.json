@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "npm nuxt dev",
-    "build": "npm nuxt build",
+    "build": "nuxt build",
     "preview": "npm nuxt preview"
   },
   "dependencies": {
