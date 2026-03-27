@@ -1,7 +1,7 @@
 <template>
   <section
     class="book-stage"
-    :class="{ 'is-mobile': isMobile }"
+    :class="{ 'is-mobile': isMobile, 'is-cover-view': !bookOpened }"
     :dir="locale === 'ar' ? 'rtl' : 'ltr'"
     @touchstart.passive="onTouchStart"
     @touchend.passive="onTouchEnd"
@@ -17,19 +17,50 @@
         <span>‹</span>
       </button>
 
-      <div class="book-frame">
+      <div class="book-frame" :class="{ 'book-frame--cover': !bookOpened }">
         <div class="book-cover-glow" aria-hidden="true"></div>
+        <div class="book-shell-shadow" aria-hidden="true"></div>
 
-        <Transition :name="transitionName" mode="out-in">
-          <div v-if="isMobile" :key="`page-${mobilePageIndex}`" class="book-mobile-page-wrap">
+        <Transition :name="bookOpened ? transitionName : 'cover-open'" mode="out-in">
+          <button
+            v-if="!bookOpened"
+            key="cover"
+            type="button"
+            class="book-cover"
+            @click="goNext"
+          >
+            <div class="book-cover__edge" aria-hidden="true"></div>
+            <div class="book-cover__hinge" aria-hidden="true"></div>
+            <div class="book-cover__shine" aria-hidden="true"></div>
+            <div class="book-cover__content">
+              <span class="book-cover__eyebrow">{{ coverLabels.eyebrow }}</span>
+              <h1 class="book-cover__title">{{ coverLabels.title }}</h1>
+              <p class="book-cover__subtitle">{{ coverLabels.subtitle }}</p>
+
+              <div class="book-cover__seal">
+                <span>{{ coverLabels.sealTop }}</span>
+                <strong>{{ coverLabels.sealBottom }}</strong>
+              </div>
+
+              <div class="book-cover__hint">
+                <span class="book-cover__hint-line"></span>
+                <span>{{ coverLabels.hint }}</span>
+                <span class="book-cover__hint-line"></span>
+              </div>
+            </div>
+          </button>
+
+          <div v-else-if="isMobile" :key="`page-${mobilePageIndex}`" class="book-mobile-page-wrap">
             <article class="book-page book-page--mobile" :class="pageSideClass(mobilePages[mobilePageIndex]?.side)">
               <div class="book-page__paper"></div>
+              <div class="book-page__paper-grain"></div>
               <div class="book-page__ornament book-page__ornament--top"></div>
               <div class="book-page__ornament book-page__ornament--bottom"></div>
 
               <header class="book-page__header">
                 <span class="book-page__kicker">{{ labels.menu }}</span>
                 <h2 class="book-page__title">{{ mobilePages[mobilePageIndex]?.title }}</h2>
+                <div class="book-page__folio">{{ mobilePageIndex + 1 }} / {{ mobilePages.length }}</div>
               </header>
 
               <div class="book-list">
@@ -56,12 +87,14 @@
 
             <article class="book-page book-page--left">
               <div class="book-page__paper"></div>
+              <div class="book-page__paper-grain"></div>
               <div class="book-page__ornament book-page__ornament--top"></div>
               <div class="book-page__ornament book-page__ornament--bottom"></div>
 
               <header class="book-page__header">
                 <span class="book-page__kicker">{{ labels.menu }}</span>
                 <h2 class="book-page__title">{{ currentSpread.left.title }}</h2>
+                <div class="book-page__folio">{{ currentSpreadIndex * 2 + 1 }}</div>
               </header>
 
               <div class="book-list">
@@ -84,12 +117,14 @@
 
             <article class="book-page book-page--right">
               <div class="book-page__paper"></div>
+              <div class="book-page__paper-grain"></div>
               <div class="book-page__ornament book-page__ornament--top"></div>
               <div class="book-page__ornament book-page__ornament--bottom"></div>
 
               <header class="book-page__header">
                 <span class="book-page__kicker">{{ labels.menu }}</span>
                 <h2 class="book-page__title">{{ currentSpread.right.title }}</h2>
+                <div class="book-page__folio">{{ currentSpreadIndex * 2 + 2 }}</div>
               </header>
 
               <div class="book-list">
@@ -138,6 +173,14 @@ type UiShape = {
   menu: string
   badges: Record<MenuBadge, string>
   sections: Record<string, string>
+  cover: {
+    eyebrow: string
+    title: string
+    subtitle: string
+    hint: string
+    sealTop: string
+    sealBottom: string
+  }
 }
 
 type MenuPage = {
@@ -154,6 +197,7 @@ type MenuPage = {
 
 const locale = ref<Locale>('ar')
 const isMobile = ref(false)
+const bookOpened = ref(false)
 const currentSpreadIndex = ref(0)
 const mobilePageIndex = ref(0)
 const navDirection = ref<'next' | 'prev'>('next')
@@ -176,6 +220,14 @@ const uiMap: Record<Locale, UiShape> = {
       desserts: 'الحلويات',
       drinks: 'المشروبات',
       signature: 'الأطباق الخاصة'
+    },
+    cover: {
+      eyebrow: 'قائمة طعام فاخرة',
+      title: 'دفتر المنيو',
+      subtitle: 'تجربة أنيقة تشبه الكتاب الحقيقي مع انتقالات سلسة وصفحات واضحة على الهاتف والحاسبة.',
+      hint: 'المس لفتح الغلاف',
+      sealTop: 'Premium',
+      sealBottom: 'Menu'
     }
   },
   en: {
@@ -194,11 +246,20 @@ const uiMap: Record<Locale, UiShape> = {
       desserts: 'Desserts',
       drinks: 'Drinks',
       signature: 'Signature'
+    },
+    cover: {
+      eyebrow: 'Luxury Dining Collection',
+      title: 'Restaurant Menu',
+      subtitle: 'An elegant book-style experience with smooth realistic motion and balanced pages for every screen.',
+      hint: 'Tap to open the cover',
+      sealTop: 'Premium',
+      sealBottom: 'Menu'
     }
   }
 }
 
 const labels = computed(() => uiMap[locale.value])
+const coverLabels = computed(() => uiMap[locale.value].cover)
 
 const spreads = computed(() => {
   const ui = uiMap[locale.value]
@@ -229,18 +290,18 @@ const spreads = computed(() => {
   })
 })
 
-const mobilePages = computed<MenuPage[]>(() =>
-  spreads.value.flatMap((spread) => [spread.left, spread.right])
-)
-
+const mobilePages = computed<MenuPage[]>(() => spreads.value.flatMap((spread) => [spread.left, spread.right]))
 const currentSpread = computed(() => spreads.value[currentSpreadIndex.value] ?? spreads.value[0])
 const transitionName = computed(() => (navDirection.value === 'next' ? 'page-next' : 'page-prev'))
 
-const canGoPrev = computed(() => (isMobile.value ? mobilePageIndex.value > 0 : currentSpreadIndex.value > 0))
+const canGoPrev = computed(() => {
+  if (!bookOpened.value) return false
+  return isMobile.value ? mobilePageIndex.value > 0 : currentSpreadIndex.value > 0
+})
+
 const canGoNext = computed(() => {
-  if (isMobile.value) {
-    return mobilePageIndex.value < mobilePages.value.length - 1
-  }
+  if (!bookOpened.value) return true
+  if (isMobile.value) return mobilePageIndex.value < mobilePages.value.length - 1
   return currentSpreadIndex.value < spreads.value.length - 1
 })
 
@@ -254,18 +315,26 @@ function syncResponsiveMode() {
   const nextIsMobile = window.innerWidth < 920
   if (nextIsMobile === isMobile.value) return
 
-  if (nextIsMobile) {
-    mobilePageIndex.value = currentSpreadIndex.value * 2
-  } else {
-    currentSpreadIndex.value = Math.floor(mobilePageIndex.value / 2)
+  if (bookOpened.value) {
+    if (nextIsMobile) {
+      mobilePageIndex.value = currentSpreadIndex.value * 2
+    } else {
+      currentSpreadIndex.value = Math.floor(mobilePageIndex.value / 2)
+    }
   }
 
   isMobile.value = nextIsMobile
 }
 
 function goNext() {
-  if (!canGoNext.value) return
   navDirection.value = 'next'
+
+  if (!bookOpened.value) {
+    bookOpened.value = true
+    return
+  }
+
+  if (!canGoNext.value) return
 
   if (isMobile.value) {
     mobilePageIndex.value += 1
@@ -276,11 +345,20 @@ function goNext() {
 }
 
 function goPrev() {
-  if (!canGoPrev.value) return
+  if (!bookOpened.value) return
   navDirection.value = 'prev'
 
   if (isMobile.value) {
+    if (mobilePageIndex.value === 0) {
+      bookOpened.value = false
+      return
+    }
     mobilePageIndex.value -= 1
+    return
+  }
+
+  if (currentSpreadIndex.value === 0) {
+    bookOpened.value = false
     return
   }
 
@@ -301,9 +379,9 @@ function onTouchEnd(event: TouchEvent) {
   if (Math.abs(delta) < 40) return
 
   if (delta < 0) {
-    goNext()
+    locale.value === 'ar' ? goPrev() : goNext()
   } else {
-    goPrev()
+    locale.value === 'ar' ? goNext() : goPrev()
   }
 }
 
