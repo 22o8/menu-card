@@ -1,6 +1,0 @@
-node_modules
-.output
-.nuxt
-.vercel
-.DS_Store
-*.log
