@@ -1,63 +1,92 @@
 <template>
   <div class="viewer-shell" :style="{ background: theme?.background || defaultBg }">
-    <button class="viewer-arrow left" @click="prevPage">‹</button>
+    <button class="viewer-arrow left" @click="prevPage" aria-label="Previous">‹</button>
 
     <div class="viewer-stage">
+      <div class="viewer-topbar glass-bar">
+        <div>
+          <strong>{{ book.title }}</strong>
+          <p>{{ book.restaurantName }} • {{ book.pages.length }} صفحات</p>
+        </div>
+        <div class="viewer-badges">
+          <span>{{ book.status === 'published' ? 'Published' : 'Draft' }}</span>
+          <NuxtLink to="/admin" class="soft-btn subtle-btn">لوحة الإدارة</NuxtLink>
+        </div>
+      </div>
+
       <div class="viewer-inner">
         <div ref="bookRef" class="flip-root"></div>
       </div>
+
+      <div class="viewer-toolbar glass-bar">
+        <button class="soft-btn subtle-btn" @click="prevPage">السابق</button>
+        <span>تقليب واقعي للمنيو</span>
+        <button class="soft-btn subtle-btn" @click="nextPage">التالي</button>
+      </div>
     </div>
 
-    <button class="viewer-arrow right" @click="nextPage">›</button>
+    <button class="viewer-arrow right" @click="nextPage" aria-label="Next">›</button>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { PageFlip } from 'page-flip'
-import { useBooks } from '~/composables/useBooks'
-import { useThemes } from '~/composables/useThemes'
+import type { MenuBook, ThemeConfig } from '~/types'
+import { useApi } from '~/composables/useApi'
 
-const props = defineProps<{ slug: string }>()
+const props = defineProps<{
+  book: MenuBook
+  theme: ThemeConfig
+}>()
+
 const bookRef = ref<HTMLElement | null>(null)
 const pageFlip = ref<any>(null)
 const defaultBg = 'radial-gradient(circle at center, #22170e 0%, #090705 75%, #000 100%)'
-const { books } = useBooks()
-const { themes } = useThemes()
-
-const book = computed(() => books.value.find(b => b.slug === props.slug) || books.value[0])
-const theme = computed(() => themes.value.find(t => t.id === book.value.themeId) || themes.value[0])
+const { toPublicAssetUrl } = useApi()
 
 const buildPages = () => {
-  if (!bookRef.value) return []
-  const pages = book.value.pages.map((page, index) => {
+  return props.book.pages.map((page, index) => {
     const el = document.createElement('div')
     el.className = index === 0 ? 'page-cover' : 'page-sheet'
     el.innerHTML = `
-      <div class="page-layer" style="background-image:url('${page.imageUrl}'), url('${theme.value.pageTexture}')">
+      <div class="page-layer" style="background-image:url('${toPublicAssetUrl(page.imageUrl)}'), url('${toPublicAssetUrl(props.theme.pageTexture)}')">
         <div class="page-shine"></div>
         <div class="page-shadow-edge"></div>
       </div>`
     return el
   })
-  return pages
 }
 
-const init = () => {
-  if (!bookRef.value) return
+const destroy = () => {
+  if (pageFlip.value) {
+    pageFlip.value.destroy()
+    pageFlip.value = null
+  }
+  if (bookRef.value) {
+    bookRef.value.innerHTML = ''
+  }
+}
+
+const init = async () => {
+  await nextTick()
+  if (!bookRef.value || !props.book?.pages?.length) return
+
+  destroy()
+
   pageFlip.value = new PageFlip(bookRef.value, {
-    width: 520,
-    height: 720,
+    width: 560,
+    height: 780,
     size: 'stretch',
     minWidth: 280,
-    maxWidth: 720,
+    maxWidth: 760,
     minHeight: 420,
-    maxHeight: 920,
-    maxShadowOpacity: theme.value.shadowStrength,
+    maxHeight: 980,
+    maxShadowOpacity: props.theme.shadowStrength,
     showCover: true,
     mobileScrollSupport: false,
     useMouseEvents: true,
-    swipeDistance: 20,
+    swipeDistance: 24,
     clickEventForward: true,
     usePortrait: true,
     startZIndex: 20,
@@ -70,7 +99,10 @@ const init = () => {
 const nextPage = () => pageFlip.value?.flipNext()
 const prevPage = () => pageFlip.value?.flipPrev()
 
-onMounted(() => {
+watch(() => [props.book.id, props.theme.id], () => {
   init()
 })
+
+onMounted(init)
+onBeforeUnmount(destroy)
 </script>

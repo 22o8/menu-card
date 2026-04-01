@@ -15,16 +15,62 @@ public class MenuBooksController(IMenuBookService service) : ControllerBase
     public IActionResult GetBySlug(string slug)
     {
         var book = service.GetBySlug(slug);
-        return book is null ? NotFound() : Ok(book);
+        return book is null ? NotFound(new { message = "Menu book not found." }) : Ok(book);
     }
 
     [HttpPost]
     public IActionResult Create([FromBody] CreateMenuBookRequest request)
     {
-        if (string.IsNullOrWhiteSpace(request.Title) || string.IsNullOrWhiteSpace(request.Slug))
-            return BadRequest("Title and Slug are required.");
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
 
-        var book = service.Create(request);
-        return CreatedAtAction(nameof(GetBySlug), new { slug = book.Slug }, book);
+        try
+        {
+            var book = service.Create(request);
+            return CreatedAtAction(nameof(GetBySlug), new { slug = book.Slug }, book);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
+    [HttpPut("{id:guid}")]
+    public IActionResult Update(Guid id, [FromBody] UpdateMenuBookRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        try
+        {
+            var book = service.Update(id, request);
+            return book is null ? NotFound(new { message = "Menu book not found." }) : Ok(book);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+    }
+
+    [HttpPatch("{id:guid}/publish")]
+    public IActionResult Publish(Guid id)
+    {
+        var book = service.SetPublication(id, publish: true);
+        return book is null ? NotFound(new { message = "Menu book not found." }) : Ok(book);
+    }
+
+    [HttpPatch("{id:guid}/unpublish")]
+    public IActionResult Unpublish(Guid id)
+    {
+        var book = service.SetPublication(id, publish: false);
+        return book is null ? NotFound(new { message = "Menu book not found." }) : Ok(book);
     }
 }

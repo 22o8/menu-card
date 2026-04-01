@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace MenuSaaS.Api.DTOs;
 
-public class CreateMenuBookRequest
+public class UpdateMenuBookRequest
 {
     [Required, MaxLength(120)]
     public string RestaurantName { get; set; } = string.Empty;
@@ -10,13 +10,12 @@ public class CreateMenuBookRequest
     [Required, MaxLength(160)]
     public string Title { get; set; } = string.Empty;
 
-    [Required, MaxLength(160)]
-    [RegularExpression("^[a-z0-9]+(?:-[a-z0-9]+)*$", ErrorMessage = "Slug must use lowercase letters, numbers, and hyphens only.")]
-    public string Slug { get; set; } = string.Empty;
-
     [MaxLength(500)]
     public string? Description { get; set; }
 
     [Required]
     public string ThemeId { get; set; } = "theme-1";
+
+    [Required]
+    public string Status { get; set; } = "draft";
 }

@@ -10,11 +10,16 @@
       </div>
 
       <nav class="sidebar-nav">
-        <NuxtLink to="/admin">الرئيسية</NuxtLink>
-        <NuxtLink to="/admin/books">المنيوهات</NuxtLink>
-        <NuxtLink to="/admin/themes">الستايلات</NuxtLink>
-        <NuxtLink to="/admin/assets">الملفات</NuxtLink>
+        <NuxtLink v-for="item in navItems" :key="item.to" :to="item.to">
+          <span>{{ item.label }}</span>
+          <small>{{ item.note }}</small>
+        </NuxtLink>
       </nav>
+
+      <div class="sidebar-foot-note">
+        <strong>جاهز للتوسع</strong>
+        <p>هيكل الإدارة صار أوضح، منظم، ومهيأ للإنتقال لاحقًا إلى نظام SaaS كامل.</p>
+      </div>
     </aside>
 
     <main class="admin-main">
@@ -22,3 +27,12 @@
     </main>
   </div>
 </template>
+
+<script setup lang="ts">
+const navItems = [
+  { to: '/admin', label: 'الرئيسية', note: 'نظرة عامة' },
+  { to: '/admin/books', label: 'المنيوهات', note: 'إنشاء وإدارة' },
+  { to: '/admin/themes', label: 'الثيمات', note: 'ستايلات العرض' },
+  { to: '/admin/assets', label: 'الملفات', note: 'الصور والخامات' }
+]
+</script>
