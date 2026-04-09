@@ -222,9 +222,11 @@ input, textarea, select {
 .viewer-book-wrap {
   min-width: 0;
   min-height: min(84vh, 980px);
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: visible;
 }
 .viewer-book-frame {
   position: relative;
@@ -232,47 +234,52 @@ input, textarea, select {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: clamp(4px, 1vw, 12px);
+  padding: clamp(2px, .4vw, 6px);
 }
 .viewer-book-shadow {
   position: absolute;
-  inset: 8% 10% 4%;
+  inset: 12% 12% 4%;
   border-radius: 42px;
-  background: radial-gradient(circle at center, rgba(0,0,0,0.42), transparent 68%);
-  filter: blur(26px);
-  transform: translateY(24px);
+  background: radial-gradient(circle at center, rgba(0,0,0,0.36), transparent 70%);
+  filter: blur(24px);
+  transform: translateY(18px);
   pointer-events: none;
 }
 .viewer-book-spine {
   position: absolute;
-  top: 6%;
-  bottom: 6%;
+  top: 5%;
+  bottom: 5%;
   left: 50%;
-  width: 18px;
+  width: 8px;
   transform: translateX(-50%);
-  background: linear-gradient(90deg, rgba(0,0,0,0.10), rgba(0,0,0,0.22), rgba(255,255,255,0.10));
-  filter: blur(7px);
-  opacity: .55;
+  background: linear-gradient(90deg, rgba(48,34,22,0.0), rgba(74,53,33,0.16), rgba(48,34,22,0.0));
+  opacity: .9;
   pointer-events: none;
-  z-index: 1;
+  z-index: 4;
 }
 .flip-root {
-  width: calc(var(--book-page-width, 520px) * 2 + 12px);
+  width: min(100%, var(--book-root-width, calc(var(--book-page-width, 520px) * 2 + 6px)));
   height: var(--book-page-height, 736px);
   max-width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
+  margin-inline: auto;
 }
 .stf__parent {
   margin-inline: auto;
-  filter: drop-shadow(0 26px 76px rgba(0,0,0,0.48));
+  filter: drop-shadow(0 22px 56px rgba(0,0,0,0.34));
+  transform: translateZ(0);
+  will-change: transform;
 }
-.stf__block {
+.stf__parent canvas,
+.stf__wrapper,
+.stf__block,
+.stf__item {
   background: transparent !important;
 }
 .page-sheet {
-  background: #f8f4ec !important;
+  background: #f7f1e6 !important;
   padding: 0 !important;
 }
 .page-image,
@@ -281,19 +288,42 @@ input, textarea, select {
   height: 100%;
 }
 .page-image {
-  background: #f8f4ec;
+  background: #f7f1e6;
 }
 .page-surface {
+  position: relative;
   overflow: hidden;
-  background: #f8f4ec;
-  box-shadow: inset 0 0 0 1px rgba(123, 100, 66, 0.06);
+  background: linear-gradient(180deg, #fbf6ee 0%, #f4ecdf 100%);
+  box-shadow: inset 0 0 0 1px rgba(123, 100, 66, 0.08);
+}
+.page-sheet.page-left .page-surface::before,
+.page-sheet.page-right .page-surface::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 18px;
+  pointer-events: none;
+  z-index: 2;
+}
+.page-sheet.page-left .page-surface::before {
+  left: 0;
+  background: linear-gradient(90deg, rgba(86,59,34,0.16), rgba(86,59,34,0.06), transparent);
+}
+.page-sheet.page-right .page-surface::before {
+  right: 0;
+  background: linear-gradient(270deg, rgba(86,59,34,0.16), rgba(86,59,34,0.06), transparent);
+}
+.page-sheet.page-cover-front .page-surface::before,
+.page-sheet.page-cover-back .page-surface::before {
+  display: none;
 }
 .page-image img {
   width: 100%;
   height: 100%;
   display: block;
   object-fit: fill;
-  background: #f8f4ec;
+  background: #f7f1e6;
   user-select: none;
   -webkit-user-drag: none;
 }
@@ -429,12 +459,11 @@ input, textarea, select {
     min-height: min(74vh, 720px);
   }
   .flip-root {
-    width: min(100%, calc(var(--book-page-width, 340px) + 4px));
+    width: min(100%, var(--book-root-width, var(--book-page-width, 340px)));
     height: var(--book-page-height, 480px);
   }
   .viewer-book-spine {
-    width: 10px;
-    opacity: .35;
+    display: none;
   }
   .viewer-arrow {
     width: 42px;
@@ -472,10 +501,10 @@ input, textarea, select {
     display: none;
   }
   .viewer-book-wrap {
-    min-height: min(64vh, 560px);
+    min-height: min(68vh, 640px);
   }
   .flip-root {
-    width: min(100%, calc(var(--book-page-width, 280px) + 4px));
+    width: min(100%, var(--book-root-width, var(--book-page-width, 280px)));
     height: var(--book-page-height, 396px);
   }
   .viewer-book-spine {

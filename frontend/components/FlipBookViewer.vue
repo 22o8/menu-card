@@ -29,7 +29,7 @@
           <span>‹</span>
         </button>
 
-        <div class="viewer-book-wrap">
+        <div ref="bookWrapRef" class="viewer-book-wrap">
           <div v-if="loading" class="viewer-state-card">
             <div class="loader-orb"></div>
             <strong>جارِ تجهيز المنيو</strong>
@@ -48,7 +48,7 @@
 
           <div v-show="!loading && !errorMessage && totalPages" class="viewer-book-frame">
             <div class="viewer-book-shadow"></div>
-            <div class="viewer-book-spine"></div>
+            <div v-if="showSpineDecor" class="viewer-book-spine"></div>
             <div ref="bookRef" class="flip-root" :style="bookFrameStyle"></div>
           </div>
         </div>
@@ -89,6 +89,8 @@ const totalPages = ref(0)
 const loading = ref(true)
 const errorMessage = ref('')
 const viewportWidth = ref(1440)
+const bookWrapRef = ref<HTMLElement | null>(null)
+const stageWidth = ref(1200)
 const isFlipping = ref(false)
 const pageRatio = ref(0.707)
 const defaultBg = 'radial-gradient(circle at center, #22170e 0%, #090705 75%, #000 100%)'
@@ -96,6 +98,7 @@ const { getBookBySlug } = useBooks()
 const { themes, loadThemes, fallbackThemes } = useThemes()
 const book = ref<any>(null)
 let resizeTimer: ReturnType<typeof setTimeout> | null = null
+let resizeObserver: ResizeObserver | null = null
 
 const theme = computed(() => themes.value.find(t => t.id === book.value?.themeId) || fallbackThemes[0])
 
@@ -104,21 +107,32 @@ const viewerVars = computed(() => ({
   '--viewer-accent': theme.value?.accent || '#f1d9a8'
 }))
 
-const isCompact = computed(() => viewportWidth.value <= 768)
+const isCompact = computed(() => viewportWidth.value <= 900)
+const isPhone = computed(() => viewportWidth.value <= 640)
+const showSpineDecor = computed(() => !isCompact.value && currentPage.value > 1 && totalPages.value > 2)
 const canGoPrev = computed(() => currentPage.value > 1)
 const canGoNext = computed(() => totalPages.value > 0 && currentPage.value < totalPages.value)
 const currentSpreadText = computed(() => `صفحة ${currentPage.value} من ${totalPages.value}`)
 
-const pageWidth = computed(() => {
-  if (viewportWidth.value <= 480) return 280
-  if (viewportWidth.value <= 768) return 340
-  if (viewportWidth.value <= 1100) return 410
-  return 520
+const spreadWidth = computed(() => {
+  const available = Math.max(320, stageWidth.value - (isCompact.value ? 0 : 20))
+  if (isPhone.value) return Math.min(available, 420)
+  if (isCompact.value) return Math.min(available, 620)
+  return Math.min(available, 1220)
 })
+
+const pageWidth = computed(() => {
+  if (isPhone.value) return Math.max(220, Math.floor(spreadWidth.value))
+  if (isCompact.value) return Math.max(260, Math.floor(spreadWidth.value))
+  return Math.max(320, Math.floor((spreadWidth.value - 6) / 2))
+})
+
 const pageHeight = computed(() => Math.round(pageWidth.value / pageRatio.value))
+const rootWidth = computed(() => (isCompact.value ? pageWidth.value : pageWidth.value * 2 + 6))
 const bookFrameStyle = computed(() => ({
   '--book-page-width': `${pageWidth.value}px`,
-  '--book-page-height': `${pageHeight.value}px`
+  '--book-page-height': `${pageHeight.value}px`,
+  '--book-root-width': `${rootWidth.value}px`
 }))
 
 const preloadRatio = async (url?: string) => {
@@ -138,7 +152,10 @@ const preloadRatio = async (url?: string) => {
 
 const buildPages = () => (book.value?.pages || []).map((page: any, index: number) => {
   const el = document.createElement('div')
-  el.className = 'page-sheet'
+  const isFirst = index === 0
+  const isLast = index === (book.value?.pages?.length || 1) - 1
+  const sideClass = index % 2 === 0 ? 'page-right' : 'page-left'
+  el.className = `page-sheet ${sideClass} ${isFirst ? 'page-cover-front' : ''} ${isLast ? 'page-cover-back' : ''}`.trim()
   el.innerHTML = `
     <div class="page-image">
       <div class="page-surface">
@@ -160,21 +177,21 @@ const getFlipConfig = () => ({
   width: pageWidth.value,
   height: pageHeight.value,
   size: 'fixed' as const,
-  minWidth: Math.max(220, Math.round(pageWidth.value * 0.72)),
-  maxWidth: Math.round(pageWidth.value * 1.08),
-  minHeight: Math.max(300, Math.round(pageHeight.value * 0.72)),
-  maxHeight: Math.round(pageHeight.value * 1.08),
-  showCover: true,
+  minWidth: Math.max(220, Math.round(pageWidth.value * 0.86)),
+  maxWidth: Math.round(pageWidth.value * 1.02),
+  minHeight: Math.max(300, Math.round(pageHeight.value * 0.86)),
+  maxHeight: Math.round(pageHeight.value * 1.02),
+  showCover: false,
   drawShadow: true,
   mobileScrollSupport: true,
   useMouseEvents: true,
   usePortrait: true,
-  maxShadowOpacity: theme.value?.shadowStrength || 0.45,
+  maxShadowOpacity: isPhone.value ? 0.16 : 0.24,
   startPage: 0,
-  flippingTime: isCompact.value ? 620 : 760,
+  flippingTime: isPhone.value ? 900 : 1050,
   autoSize: false,
   clickEventForward: true,
-  swipeDistance: isCompact.value ? 16 : 28,
+  swipeDistance: isPhone.value ? 12 : 20,
   showPageCorners: !isCompact.value,
   disableFlipByClick: false
 })
@@ -212,6 +229,7 @@ const init = async () => {
   await ensureLibrary()
   destroy()
   await nextTick()
+  refreshViewport()
 
   pageFlip.value = new PageFlipCtor.value(bookRef.value, getFlipConfig())
   pageFlip.value.loadFromHTML(buildPages())
@@ -222,6 +240,7 @@ const init = async () => {
 
 const refreshViewport = () => {
   viewportWidth.value = window.innerWidth
+  stageWidth.value = Math.max(320, Math.floor(bookWrapRef.value?.clientWidth || window.innerWidth - 24))
 }
 
 const reinitialize = async () => {
@@ -269,6 +288,10 @@ onMounted(async () => {
   refreshViewport()
   window.addEventListener('resize', onResize)
   window.addEventListener('keydown', onKeydown)
+  if (import.meta.client && 'ResizeObserver' in window) {
+    resizeObserver = new ResizeObserver(() => onResize())
+    if (bookWrapRef.value) resizeObserver.observe(bookWrapRef.value)
+  }
   await loadBook()
 })
 
@@ -280,6 +303,7 @@ onBeforeUnmount(() => {
   if (resizeTimer) clearTimeout(resizeTimer)
   window.removeEventListener('resize', onResize)
   window.removeEventListener('keydown', onKeydown)
+  resizeObserver?.disconnect()
   destroy()
 })
 </script>
