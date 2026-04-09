@@ -4,7 +4,7 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
   runtimeConfig: {
     public: {
-      apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:5117'
+      apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:5117/api'
     }
   },
   app: {
@@ -13,11 +13,7 @@ export default defineNuxtConfig({
       meta: [
         { name: 'viewport', content: 'width=device-width, initial-scale=1' },
         { name: 'description', content: 'منصة إدارة منيو بوك تفاعلي للمطاعم' }
-      ],
-      htmlAttrs: {
-        lang: 'ar',
-        dir: 'rtl'
-      }
+      ]
     }
   }
 })

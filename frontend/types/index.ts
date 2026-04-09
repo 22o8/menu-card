@@ -8,8 +8,8 @@ export interface ThemeConfig {
   pageTexture: string
   accent: string
   shadowStrength: number
-  openCoverAnimation?: boolean
-  flipSound?: boolean
+  openCoverAnimation: boolean
+  flipSound: boolean
 }
 
 export interface MenuPageItem {
@@ -24,40 +24,12 @@ export interface MenuBook {
   restaurantName: string
   title: string
   slug: string
-  description?: string | null
-  coverImageUrl?: string | null
+  description?: string
+  coverImageUrl?: string
   themeId: string
   status: 'draft' | 'published'
-  pageCount?: number
+  pageCount: number
   views: number
-  updatedAt?: string
-  updatedAtUtc?: string
+  updatedAt: string
   pages: MenuPageItem[]
-}
-
-export interface AssetItem {
-  id: string
-  name: string
-  type: string
-  url: string
-  sizeInBytes: number
-  uploadedAtUtc: string
-}
-
-export interface DashboardSummary {
-  totalBooks: number
-  publishedBooks: number
-  draftBooks: number
-  totalPages: number
-  totalViews: number
-  totalThemes: number
-  totalAssets: number
-}
-
-export interface CreateMenuBookPayload {
-  restaurantName: string
-  title: string
-  slug: string
-  description?: string
-  themeId: string
 }

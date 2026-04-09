@@ -1,134 +1,107 @@
-import type { CreateMenuBookPayload, MenuBook } from '~/types'
-import { useApi } from './useApi'
-
-const demoPages = [
-  { id: 'p1', title: 'Cover', imageUrl: '/demo/cover.jpg', order: 1 },
-  { id: 'p2', title: 'Breakfast', imageUrl: '/demo/page-1.jpg', order: 2 },
-  { id: 'p3', title: 'Main Dishes', imageUrl: '/demo/page-2.jpg', order: 3 },
-  { id: 'p4', title: 'Desserts', imageUrl: '/demo/page-3.jpg', order: 4 }
-]
-
-const demoBooks: MenuBook[] = [
-  {
-    id: 'book-1',
-    restaurantName: 'Blossom House',
-    title: 'Main Menu 2026',
-    slug: 'blossom-house-main-menu',
-    description: 'منيو المطعم الرئيسي المصمم بأسلوب أنيق وجاهز للمشاركة عبر الرابط أو QR.',
-    coverImageUrl: '/demo/cover.jpg',
-    themeId: 'theme-1',
-    status: 'published',
-    pageCount: 4,
-    views: 1248,
-    updatedAtUtc: '2026-03-29T11:00:00Z',
-    pages: demoPages
-  },
-  {
-    id: 'book-2',
-    restaurantName: 'Blossom House',
-    title: 'Dessert Book',
-    slug: 'blossom-house-dessert-book',
-    description: 'نسخة مختصرة لمنيو الحلويات والمشروبات.',
-    coverImageUrl: '/demo/cover-2.jpg',
-    themeId: 'theme-4',
-    status: 'draft',
-    pageCount: 3,
-    views: 87,
-    updatedAtUtc: '2026-03-28T09:20:00Z',
-    pages: demoPages.slice(0, 3)
-  }
-]
-
-const normalizeBook = (book: MenuBook): MenuBook => ({
-  ...book,
-  pageCount: book.pageCount ?? book.pages?.length ?? 0,
-  updatedAt: book.updatedAt ?? book.updatedAtUtc,
-  updatedAtUtc: book.updatedAtUtc ?? book.updatedAt,
-  pages: [...(book.pages || [])].sort((a, b) => a.order - b.order)
-})
+import type { MenuBook } from '~/types'
+import { useApi } from '~/composables/useApi'
 
 export const useBooks = () => {
-  const { buildUrl } = useApi()
-  const books = useState<MenuBook[]>('books', () => demoBooks.map(normalizeBook))
-  const pending = useState<boolean>('books-pending', () => false)
-  const loaded = useState<boolean>('books-loaded', () => false)
-  const errorMessage = useState<string | null>('books-error', () => null)
+  const books = useState<MenuBook[]>('books', () => [])
+  const loading = useState<boolean>('books-loading', () => false)
+  const { request, getAssetUrl } = useApi()
 
-  const loadBooks = async (force = false) => {
-    if (loaded.value && !force) return books.value
-    pending.value = true
-    errorMessage.value = null
+  const fallbackBooks: MenuBook[] = [
+    {
+      id: 'book-1',
+      restaurantName: 'Blossom House',
+      title: 'Main Menu 2026',
+      slug: 'blossom-house-main-menu',
+      description: 'منيو المطعم الرئيسي',
+      coverImageUrl: '/demo/cover.jpg',
+      themeId: 'theme-1',
+      status: 'published',
+      pageCount: 4,
+      views: 1248,
+      updatedAt: '2026-03-29T11:00:00Z',
+      pages: [
+        { id: 'p1', title: 'Cover', imageUrl: '/demo/cover.jpg', order: 1 },
+        { id: 'p2', title: 'Breakfast', imageUrl: '/demo/page-1.jpg', order: 2 },
+        { id: 'p3', title: 'Main Dishes', imageUrl: '/demo/page-2.jpg', order: 3 },
+        { id: 'p4', title: 'Desserts', imageUrl: '/demo/page-3.jpg', order: 4 }
+      ]
+    }
+  ]
 
+  const normalizeBook = (item: any): MenuBook => ({
+    id: String(item.id),
+    restaurantName: item.restaurantName,
+    title: item.title,
+    slug: item.slug,
+    description: item.description,
+    coverImageUrl: getAssetUrl(item.coverImageUrl),
+    themeId: item.themeId,
+    status: item.status,
+    pageCount: item.pageCount ?? item.pages?.length ?? 0,
+    views: item.views ?? 0,
+    updatedAt: item.updatedAtUtc ?? item.updatedAt ?? new Date().toISOString(),
+    pages: (item.pages || []).sort((a: any, b: any) => a.order - b.order).map((page: any) => ({
+      id: String(page.id),
+      title: page.title,
+      imageUrl: getAssetUrl(page.imageUrl),
+      order: page.order
+    }))
+  })
+
+  const loadBooks = async () => {
+    if (loading.value) return
+    loading.value = true
     try {
-      const data = await $fetch<MenuBook[]>(buildUrl('/MenuBooks'))
+      const data = await request<any[]>('/menubooks')
       books.value = data.map(normalizeBook)
-      loaded.value = true
-    } catch (error: any) {
-      errorMessage.value = error?.data?.message || error?.message || 'تعذر تحميل المنيوهات من الـ API.'
-      books.value = demoBooks.map(normalizeBook)
-    } finally {
-      pending.value = false
-    }
-
-    return books.value
-  }
-
-  const createBook = async (payload: CreateMenuBookPayload) => {
-    pending.value = true
-    errorMessage.value = null
-
-    try {
-      const created = await $fetch<MenuBook>(buildUrl('/MenuBooks'), {
-        method: 'POST',
-        body: payload
-      })
-      books.value = [normalizeBook(created), ...books.value]
-      loaded.value = true
-      return { ok: true, data: normalizeBook(created) }
-    } catch (error: any) {
-      const fallbackBook: MenuBook = normalizeBook({
-        id: crypto.randomUUID(),
-        restaurantName: payload.restaurantName,
-        title: payload.title,
-        slug: payload.slug,
-        description: payload.description,
-        coverImageUrl: '/demo/cover.jpg',
-        themeId: payload.themeId,
-        status: 'draft',
-        pageCount: 0,
-        views: 0,
-        updatedAtUtc: new Date().toISOString(),
-        pages: []
-      })
-      books.value = [fallbackBook, ...books.value]
-      errorMessage.value = error?.data?.message || error?.message || 'تم الحفظ محليًا بسبب عدم توفر الـ API.'
-      return { ok: false, data: fallbackBook }
-    } finally {
-      pending.value = false
-    }
-  }
-
-  const publishBook = async (id: string) => {
-    try {
-      const updated = await $fetch<MenuBook>(buildUrl(`/MenuBooks/${id}/publish`), { method: 'PATCH' })
-      books.value = books.value.map((book) => book.id === id ? normalizeBook(updated) : book)
-      return true
     } catch {
-      books.value = books.value.map((book) => book.id === id ? { ...book, status: 'published', updatedAtUtc: new Date().toISOString() } : book)
-      return false
+      books.value = fallbackBooks
+    } finally {
+      loading.value = false
     }
   }
 
-  const getBookBySlug = (slug: string) => books.value.find((book) => book.slug === slug)
-
-  return {
-    books,
-    pending,
-    loaded,
-    errorMessage,
-    loadBooks,
-    createBook,
-    publishBook,
-    getBookBySlug
+  const getBookBySlug = async (slug: string) => {
+    try {
+      const data = await request<any>(`/menubooks/${slug}`)
+      return normalizeBook(data)
+    } catch {
+      return books.value.find((b) => b.slug === slug) || fallbackBooks[0]
+    }
   }
+
+  const getBookById = async (id: string) => {
+    const data = await request<any>(`/menubooks/id/${id}`)
+    return normalizeBook(data)
+  }
+
+  const createBook = async (payload: any) => {
+    const created = await request<any>('/menubooks', { method: 'POST', body: payload })
+    await loadBooks()
+    return normalizeBook(created)
+  }
+
+  const updateBook = async (id: string, payload: any) => {
+    const updated = await request<any>(`/menubooks/${id}`, { method: 'PUT', body: payload })
+    await loadBooks()
+    return normalizeBook(updated)
+  }
+
+  const addPages = async (id: string, payload: any) => {
+    const updated = await request<any>(`/menubooks/${id}/pages`, { method: 'POST', body: payload })
+    await loadBooks()
+    return normalizeBook(updated)
+  }
+
+  const deletePage = async (bookId: string, pageId: string) => {
+    await request(`/menubooks/${bookId}/pages/${pageId}`, { method: 'DELETE' })
+    await loadBooks()
+  }
+
+  const deleteBook = async (id: string) => {
+    await request(`/menubooks/${id}`, { method: 'DELETE' })
+    await loadBooks()
+  }
+
+  return { books, loading, loadBooks, getBookBySlug, getBookById, createBook, updateBook, addPages, deletePage, deleteBook }
 }

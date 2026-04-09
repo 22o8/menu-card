@@ -8,7 +8,6 @@
     <div class="theme-meta">
       <h3>{{ theme.name }}</h3>
       <p>{{ theme.preset }}</p>
-      <small class="mono-text">Accent: {{ theme.accent }}</small>
     </div>
   </div>
 </template>

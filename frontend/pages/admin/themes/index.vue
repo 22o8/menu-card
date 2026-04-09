@@ -2,11 +2,10 @@
   <AdminShell>
     <div class="page-head">
       <div>
-        <span class="eyebrow">Themes</span>
-        <h1>الثيمات الجاهزة</h1>
-        <p>تم تحسين عرض الثيمات لتكون أوضح بصريًا ومناسبة لإضافة محرر ستايلات كامل لاحقًا.</p>
+        <h1>الستايلات الجاهزة</h1>
+        <p>النسخة الأولى تحتوي على 4 Themes ويمكن لاحقًا إضافة محرر ستايلات كامل.</p>
       </div>
-      <button class="soft-btn primary-btn">إضافة ثيم</button>
+      <button class="soft-btn primary-btn">إضافة ستايل</button>
     </div>
 
     <div class="theme-grid">
@@ -19,7 +18,5 @@
 import AdminShell from '~/components/AdminShell.vue'
 import ThemeCard from '~/components/ThemeCard.vue'
 import { useThemes } from '~/composables/useThemes'
-
-const { themes, loadThemes } = useThemes()
-await loadThemes()
+const { themes } = useThemes()
 </script>

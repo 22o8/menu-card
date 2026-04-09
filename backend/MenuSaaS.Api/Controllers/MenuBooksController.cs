@@ -6,7 +6,7 @@ namespace MenuSaaS.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class MenuBooksController(IMenuBookService service) : ControllerBase
+public class MenuBooksController(IMenuBookService service, IAdminGuard adminGuard) : ControllerBase
 {
     [HttpGet]
     public IActionResult GetAll() => Ok(service.GetBooks());
@@ -15,62 +15,83 @@ public class MenuBooksController(IMenuBookService service) : ControllerBase
     public IActionResult GetBySlug(string slug)
     {
         var book = service.GetBySlug(slug);
-        return book is null ? NotFound(new { message = "Menu book not found." }) : Ok(book);
+        return book is null ? NotFound() : Ok(book);
+    }
+
+    [HttpGet("id/{id:guid}")]
+    public IActionResult GetById(Guid id)
+    {
+        var book = service.GetById(id);
+        return book is null ? NotFound() : Ok(book);
     }
 
     [HttpPost]
     public IActionResult Create([FromBody] CreateMenuBookRequest request)
     {
-        if (!ModelState.IsValid)
-        {
-            return ValidationProblem(ModelState);
-        }
+        if (!adminGuard.IsValid(Request)) return Unauthorized("مفتاح الأدمن غير صحيح.");
 
         try
         {
             var book = service.Create(request);
             return CreatedAtAction(nameof(GetBySlug), new { slug = book.Slug }, book);
         }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { message = ex.Message });
-        }
         catch (InvalidOperationException ex)
         {
-            return Conflict(new { message = ex.Message });
+            return BadRequest(ex.Message);
         }
     }
 
     [HttpPut("{id:guid}")]
     public IActionResult Update(Guid id, [FromBody] UpdateMenuBookRequest request)
     {
-        if (!ModelState.IsValid)
-        {
-            return ValidationProblem(ModelState);
-        }
+        if (!adminGuard.IsValid(Request)) return Unauthorized("مفتاح الأدمن غير صحيح.");
 
         try
         {
-            var book = service.Update(id, request);
-            return book is null ? NotFound(new { message = "Menu book not found." }) : Ok(book);
+            return Ok(service.Update(id, request));
         }
-        catch (KeyNotFoundException ex)
+        catch (InvalidOperationException ex)
         {
-            return NotFound(new { message = ex.Message });
+            return BadRequest(ex.Message);
         }
     }
 
-    [HttpPatch("{id:guid}/publish")]
-    public IActionResult Publish(Guid id)
+    [HttpPost("{id:guid}/pages")]
+    public IActionResult AddPages(Guid id, [FromBody] AddPagesRequest request)
     {
-        var book = service.SetPublication(id, publish: true);
-        return book is null ? NotFound(new { message = "Menu book not found." }) : Ok(book);
+        if (!adminGuard.IsValid(Request)) return Unauthorized("مفتاح الأدمن غير صحيح.");
+
+        try
+        {
+            return Ok(service.AddPages(id, request));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
-    [HttpPatch("{id:guid}/unpublish")]
-    public IActionResult Unpublish(Guid id)
+    [HttpDelete("{id:guid}")]
+    public IActionResult Delete(Guid id)
     {
-        var book = service.SetPublication(id, publish: false);
-        return book is null ? NotFound(new { message = "Menu book not found." }) : Ok(book);
+        if (!adminGuard.IsValid(Request)) return Unauthorized("مفتاح الأدمن غير صحيح.");
+        service.Delete(id);
+        return NoContent();
+    }
+
+    [HttpDelete("{bookId:guid}/pages/{pageId:guid}")]
+    public IActionResult DeletePage(Guid bookId, Guid pageId)
+    {
+        if (!adminGuard.IsValid(Request)) return Unauthorized("مفتاح الأدمن غير صحيح.");
+
+        try
+        {
+            service.DeletePage(bookId, pageId);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 }
