@@ -4,43 +4,34 @@ using Microsoft.AspNetCore.Http.Features;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 🔥 رفع الحد الأقصى للملفات (مثلاً 100MB)
 builder.Services.Configure<FormOptions>(options =>
 {
-    options.MultipartBodyLengthLimit = 104857600; // 100MB
+    options.MultipartBodyLengthLimit = 104857600; // 100 MB
 });
 
-// Services
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
 builder.Services.AddSingleton<DemoStore>();
 builder.Services.AddSingleton<IAdminGuard, AdminGuard>();
 builder.Services.AddScoped<IMenuBookService, MenuBookService>();
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("open", policy =>
-        policy.AllowAnyOrigin()
-              .AllowAnyHeader()
-              .AllowAnyMethod());
+    options.AddPolicy("open", policy => policy
+        .AllowAnyOrigin()
+        .AllowAnyHeader()
+        .AllowAnyMethod());
 });
 
 var app = builder.Build();
 
-// إنشاء فولدر الرفع
 var webRoot = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
 Directory.CreateDirectory(Path.Combine(webRoot, "uploads", "menubooks"));
 
-// Middlewares
 app.UseSwagger();
 app.UseSwaggerUI();
-
 app.UseCors("open");
-
 app.UseStaticFiles();
-
 app.MapControllers();
-
 app.Run();

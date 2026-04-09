@@ -1,18 +1,33 @@
+const normalizeApiBase = (raw: string) => {
+  const trimmed = String(raw || '').trim()
+  if (!trimmed) return 'http://localhost:5117'
+
+  let value = trimmed
+    .replace(/^['"]|['"]$/g, '')
+    .replace(/\/$/, '')
+
+  if (!/^https?:\/\//i.test(value)) {
+    value = `https://${value.replace(/^\/+/, '')}`
+  }
+
+  value = value.replace(/\/api\/?$/i, '')
+  return value
+}
+
 export const useApi = () => {
   const config = useRuntimeConfig()
-  const base = computed(() => String(config.public.apiBase || '').replace(/\/$/, ''))
+  const apiBase = computed(() => normalizeApiBase(String(config.public.apiBase || '')))
 
   const getApiUrl = (path: string) => {
     const clean = path.startsWith('/') ? path : `/${path}`
-    if (/\/api\//.test(clean)) return `${base.value}${clean}`
-    return `${base.value}/api${clean}`
+    if (/^https?:\/\//i.test(clean)) return clean
+    return clean.startsWith('/api/') ? `${apiBase.value}${clean}` : `${apiBase.value}/api${clean}`
   }
 
   const getAssetUrl = (path?: string | null) => {
     if (!path) return ''
     if (/^https?:\/\//i.test(path) || path.startsWith('data:')) return path
-    const origin = base.value.replace(/\/api$/, '')
-    return `${origin}${path.startsWith('/') ? path : `/${path}`}`
+    return `${apiBase.value}${path.startsWith('/') ? path : `/${path}`}`
   }
 
   const adminKey = useState<string>('admin-key', () => '')
@@ -20,8 +35,11 @@ export const useApi = () => {
   const request = async <T>(path: string, options: any = {}) => {
     const headers = new Headers(options.headers || {})
     if (adminKey.value) headers.set('x-admin-key', adminKey.value)
-    return await $fetch<T>(getApiUrl(path), { ...options, headers })
+    return await $fetch<T>(getApiUrl(path), {
+      ...options,
+      headers
+    })
   }
 
-  return { base, adminKey, getApiUrl, getAssetUrl, request }
+  return { apiBase, adminKey, getApiUrl, getAssetUrl, request }
 }
