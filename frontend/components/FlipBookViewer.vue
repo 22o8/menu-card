@@ -14,7 +14,7 @@
 
         <div class="viewer-meta">
           <span class="viewer-chip">{{ totalPages }} صفحات</span>
-          <span class="viewer-chip accent-chip">{{ currentPage }} / {{ totalPages }}</span>
+          <span class="viewer-chip accent-chip">{{ currentSpreadText }}</span>
         </div>
       </div>
 
@@ -22,7 +22,7 @@
         <button
           class="viewer-arrow left"
           type="button"
-          :disabled="!canGoPrev"
+          :disabled="!canGoPrev || isFlipping"
           aria-label="الصفحة السابقة"
           @click="prevPage"
         >
@@ -48,14 +48,15 @@
 
           <div v-show="!loading && !errorMessage && totalPages" class="viewer-book-frame">
             <div class="viewer-book-shadow"></div>
-            <div ref="bookRef" class="flip-root"></div>
+            <div class="viewer-book-spine"></div>
+            <div ref="bookRef" class="flip-root" :style="bookFrameStyle"></div>
           </div>
         </div>
 
         <button
           class="viewer-arrow right"
           type="button"
-          :disabled="!canGoNext"
+          :disabled="!canGoNext || isFlipping"
           aria-label="الصفحة التالية"
           @click="nextPage"
         >
@@ -64,11 +65,11 @@
       </div>
 
       <div class="viewer-toolbar">
-        <button class="viewer-tool-btn" type="button" :disabled="!canGoPrev" @click="goToFirst">« البداية</button>
-        <button class="viewer-tool-btn" type="button" :disabled="!canGoPrev" @click="prevPage">السابق</button>
-        <div class="viewer-pagination">صفحة {{ currentPage }} من {{ totalPages }}</div>
-        <button class="viewer-tool-btn" type="button" :disabled="!canGoNext" @click="nextPage">التالي</button>
-        <button class="viewer-tool-btn" type="button" :disabled="!canGoNext" @click="goToLast">النهاية »</button>
+        <button class="viewer-tool-btn" type="button" :disabled="!canGoPrev || isFlipping" @click="goToFirst">« البداية</button>
+        <button class="viewer-tool-btn" type="button" :disabled="!canGoPrev || isFlipping" @click="prevPage">السابق</button>
+        <div class="viewer-pagination">{{ currentSpreadText }}</div>
+        <button class="viewer-tool-btn" type="button" :disabled="!canGoNext || isFlipping" @click="nextPage">التالي</button>
+        <button class="viewer-tool-btn" type="button" :disabled="!canGoNext || isFlipping" @click="goToLast">النهاية »</button>
       </div>
     </div>
   </div>
@@ -76,18 +77,20 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { PageFlip } from 'page-flip'
 import { useBooks } from '~/composables/useBooks'
 import { useThemes } from '~/composables/useThemes'
 
 const props = defineProps<{ slug: string }>()
 const bookRef = ref<HTMLElement | null>(null)
 const pageFlip = ref<any>(null)
+const PageFlipCtor = ref<any>(null)
 const currentPage = ref(1)
 const totalPages = ref(0)
 const loading = ref(true)
 const errorMessage = ref('')
 const viewportWidth = ref(1440)
+const isFlipping = ref(false)
+const pageRatio = ref(0.707)
 const defaultBg = 'radial-gradient(circle at center, #22170e 0%, #090705 75%, #000 100%)'
 const { getBookBySlug } = useBooks()
 const { themes, loadThemes, fallbackThemes } = useThemes()
@@ -104,6 +107,34 @@ const viewerVars = computed(() => ({
 const isCompact = computed(() => viewportWidth.value <= 768)
 const canGoPrev = computed(() => currentPage.value > 1)
 const canGoNext = computed(() => totalPages.value > 0 && currentPage.value < totalPages.value)
+const currentSpreadText = computed(() => `صفحة ${currentPage.value} من ${totalPages.value}`)
+
+const pageWidth = computed(() => {
+  if (viewportWidth.value <= 480) return 280
+  if (viewportWidth.value <= 768) return 340
+  if (viewportWidth.value <= 1100) return 410
+  return 520
+})
+const pageHeight = computed(() => Math.round(pageWidth.value / pageRatio.value))
+const bookFrameStyle = computed(() => ({
+  '--book-page-width': `${pageWidth.value}px`,
+  '--book-page-height': `${pageHeight.value}px`
+}))
+
+const preloadRatio = async (url?: string) => {
+  if (!url || !import.meta.client) return
+  try {
+    const ratio = await new Promise<number>((resolve) => {
+      const img = new Image()
+      img.onload = () => resolve(img.naturalWidth > 0 && img.naturalHeight > 0 ? img.naturalWidth / img.naturalHeight : 0.707)
+      img.onerror = () => resolve(0.707)
+      img.src = url
+    })
+    if (ratio > 0.45 && ratio < 1.1) pageRatio.value = ratio
+  } catch {
+    pageRatio.value = 0.707
+  }
+}
 
 const buildPages = () => (book.value?.pages || []).map((page: any, index: number) => {
   const el = document.createElement('div')
@@ -111,7 +142,7 @@ const buildPages = () => (book.value?.pages || []).map((page: any, index: number
   el.innerHTML = `
     <div class="page-image">
       <div class="page-surface">
-        <img src="${page.imageUrl}" alt="${page.title || `Page ${index + 1}`}" loading="lazy" />
+        <img src="${page.imageUrl}" alt="${page.title || `Page ${index + 1}`}" loading="eager" draggable="false" />
       </div>
     </div>`
   return el
@@ -125,32 +156,28 @@ const destroy = () => {
   if (bookRef.value) bookRef.value.innerHTML = ''
 }
 
-const getFlipConfig = () => {
-  const compact = isCompact.value
-
-  return {
-    width: compact ? 360 : 720,
-    height: compact ? 520 : 1020,
-    size: 'stretch' as const,
-    minWidth: compact ? 240 : 320,
-    maxWidth: compact ? 420 : 960,
-    minHeight: compact ? 320 : 480,
-    maxHeight: compact ? 620 : 1260,
-    showCover: true,
-    drawShadow: true,
-    mobileScrollSupport: false,
-    useMouseEvents: true,
-    usePortrait: true,
-    maxShadowOpacity: theme.value?.shadowStrength || 0.65,
-    startPage: 0,
-    flippingTime: compact ? 550 : 700,
-    autoSize: true,
-    clickEventForward: true,
-    swipeDistance: compact ? 18 : 28,
-    showPageCorners: !compact,
-    disableFlipByClick: false
-  }
-}
+const getFlipConfig = () => ({
+  width: pageWidth.value,
+  height: pageHeight.value,
+  size: 'fixed' as const,
+  minWidth: Math.max(220, Math.round(pageWidth.value * 0.72)),
+  maxWidth: Math.round(pageWidth.value * 1.08),
+  minHeight: Math.max(300, Math.round(pageHeight.value * 0.72)),
+  maxHeight: Math.round(pageHeight.value * 1.08),
+  showCover: true,
+  drawShadow: true,
+  mobileScrollSupport: true,
+  useMouseEvents: true,
+  usePortrait: true,
+  maxShadowOpacity: theme.value?.shadowStrength || 0.45,
+  startPage: 0,
+  flippingTime: isCompact.value ? 620 : 760,
+  autoSize: false,
+  clickEventForward: true,
+  swipeDistance: isCompact.value ? 16 : 28,
+  showPageCorners: !isCompact.value,
+  disableFlipByClick: false
+})
 
 const bindFlipEvents = () => {
   if (!pageFlip.value) return
@@ -159,10 +186,21 @@ const bindFlipEvents = () => {
     currentPage.value = (e.data || 0) + 1
   })
 
-  pageFlip.value.on('changeState', () => {
-    const current = pageFlip.value?.getCurrentPageIndex?.() ?? 0
-    currentPage.value = current + 1
+  pageFlip.value.on('changeState', (e: any) => {
+    isFlipping.value = e?.data === 'flipping'
   })
+
+  pageFlip.value.on('init', () => {
+    currentPage.value = 1
+    isFlipping.value = false
+  })
+}
+
+const ensureLibrary = async () => {
+  if (PageFlipCtor.value || !import.meta.client) return
+  const mod: any = await import('page-flip')
+  PageFlipCtor.value = mod?.PageFlip || mod?.default?.PageFlip || mod?.default || null
+  if (!PageFlipCtor.value) throw new Error('تعذر تحميل مكتبة تقليب الصفحات.')
 }
 
 const init = async () => {
@@ -171,10 +209,11 @@ const init = async () => {
     return
   }
 
+  await ensureLibrary()
   destroy()
   await nextTick()
 
-  pageFlip.value = new PageFlip(bookRef.value, getFlipConfig())
+  pageFlip.value = new PageFlipCtor.value(bookRef.value, getFlipConfig())
   pageFlip.value.loadFromHTML(buildPages())
   totalPages.value = book.value.pages.length
   currentPage.value = 1
@@ -190,12 +229,12 @@ const reinitialize = async () => {
   await init()
 }
 
-const nextPage = () => pageFlip.value?.flipNext()
-const prevPage = () => pageFlip.value?.flipPrev()
-const goToFirst = () => pageFlip.value?.flip(0)
+const nextPage = () => pageFlip.value?.flipNext('top')
+const prevPage = () => pageFlip.value?.flipPrev('top')
+const goToFirst = () => pageFlip.value?.flip(0, 'top')
 const goToLast = () => {
   if (!totalPages.value) return
-  pageFlip.value?.flip(totalPages.value - 1)
+  pageFlip.value?.flip(totalPages.value - 1, 'top')
 }
 
 const onKeydown = (event: KeyboardEvent) => {
@@ -207,7 +246,7 @@ const onResize = () => {
   if (resizeTimer) clearTimeout(resizeTimer)
   resizeTimer = setTimeout(() => {
     reinitialize()
-  }, 160)
+  }, 180)
 }
 
 const loadBook = async () => {
@@ -217,6 +256,7 @@ const loadBook = async () => {
   try {
     await loadThemes()
     book.value = await getBookBySlug(props.slug)
+    await preloadRatio(book.value?.pages?.[0]?.imageUrl)
     await init()
   } catch (error: any) {
     errorMessage.value = error?.message || 'حدث خطأ أثناء تحميل البيانات.'
