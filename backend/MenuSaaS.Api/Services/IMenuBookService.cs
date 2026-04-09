@@ -1,3 +1,4 @@
+
 using MenuSaaS.Api.DTOs;
 using MenuSaaS.Api.Models;
 
@@ -14,4 +15,6 @@ public interface IMenuBookService
     void Delete(Guid id);
     void DeletePage(Guid bookId, Guid pageId);
     IReadOnlyList<ThemePreset> GetThemes();
+    MenuPage? GetPage(Guid bookId, Guid pageId);
+    MenuPage? GetPage(string slug, Guid pageId);
 }

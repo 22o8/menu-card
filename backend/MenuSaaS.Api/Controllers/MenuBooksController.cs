@@ -1,3 +1,4 @@
+
 using MenuSaaS.Api.DTOs;
 using MenuSaaS.Api.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -23,6 +24,26 @@ public class MenuBooksController(IMenuBookService service, IAdminGuard adminGuar
     {
         var book = service.GetById(id);
         return book is null ? NotFound() : Ok(book);
+    }
+
+    [HttpGet("{slug}/pages/{pageId:guid}/image")]
+    public IActionResult GetPageImage(string slug, Guid pageId)
+    {
+        var page = service.GetPage(slug, pageId);
+        if (page is null) return NotFound();
+
+        if (!string.IsNullOrWhiteSpace(page.ImageData))
+        {
+            var bytes = Convert.FromBase64String(page.ImageData);
+            return File(bytes, page.ImageMimeType);
+        }
+
+        if (!string.IsNullOrWhiteSpace(page.ImageUrl) && !page.ImageUrl.StartsWith("/api/", StringComparison.OrdinalIgnoreCase))
+        {
+            return Redirect(page.ImageUrl);
+        }
+
+        return NotFound();
     }
 
     [HttpPost]

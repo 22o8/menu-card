@@ -1,3 +1,4 @@
+
 using MenuSaaS.Api.Data;
 using MenuSaaS.Api.DTOs;
 using MenuSaaS.Api.Models;
@@ -11,7 +12,11 @@ public class MenuBookService(DemoStore store, IWebHostEnvironment environment) :
     public MenuBook? GetBySlug(string slug)
     {
         var book = store.Books.FirstOrDefault(x => x.Slug.Equals(slug, StringComparison.OrdinalIgnoreCase));
-        if (book is not null) book.Views += 1;
+        if (book is not null)
+        {
+            book.Views += 1;
+            store.Save();
+        }
         return book;
     }
 
@@ -20,22 +25,24 @@ public class MenuBookService(DemoStore store, IWebHostEnvironment environment) :
     public MenuBook Create(CreateMenuBookRequest request)
     {
         ValidateCreate(request);
-        EnsureSlugAvailable(request.Slug, null);
+        var normalizedSlug = request.Slug.Trim().ToLowerInvariant();
+        EnsureSlugAvailable(normalizedSlug, null);
 
         var book = new MenuBook
         {
             RestaurantName = request.RestaurantName.Trim(),
             Title = request.Title.Trim(),
-            Slug = request.Slug.Trim().ToLowerInvariant(),
+            Slug = normalizedSlug,
             Description = request.Description?.Trim(),
             ThemeId = request.ThemeId,
             Status = request.Publish ? "published" : "draft",
             UpdatedAtUtc = DateTime.UtcNow,
-            Pages = SavePages(request.Slug, request.Pages, 0)
+            Pages = SavePages(normalizedSlug, request.Pages, 0)
         };
 
         book.CoverImageUrl = book.Pages.FirstOrDefault()?.ImageUrl;
         store.Books.Add(book);
+        store.Save();
         return book;
     }
 
@@ -47,14 +54,26 @@ public class MenuBookService(DemoStore store, IWebHostEnvironment environment) :
             throw new InvalidOperationException("العنوان والرابط المختصر مطلوبان.");
         }
 
-        EnsureSlugAvailable(request.Slug, id);
+        var oldSlug = book.Slug;
+        var newSlug = request.Slug.Trim().ToLowerInvariant();
+        EnsureSlugAvailable(newSlug, id);
         book.RestaurantName = request.RestaurantName.Trim();
         book.Title = request.Title.Trim();
-        book.Slug = request.Slug.Trim().ToLowerInvariant();
+        book.Slug = newSlug;
         book.Description = request.Description?.Trim();
         book.ThemeId = request.ThemeId;
         book.Status = request.Publish ? "published" : "draft";
         book.UpdatedAtUtc = DateTime.UtcNow;
+
+        if (!string.Equals(oldSlug, newSlug, StringComparison.OrdinalIgnoreCase))
+        {
+            foreach (var page in book.Pages)
+            {
+                page.ImageUrl = $"/api/menubooks/{newSlug}/pages/{page.Id}/image";
+            }
+        }
+
+        store.Save();
         return book;
     }
 
@@ -72,6 +91,7 @@ public class MenuBookService(DemoStore store, IWebHostEnvironment environment) :
         book.Pages = book.Pages.OrderBy(p => p.Order).ToList();
         book.CoverImageUrl ??= book.Pages.FirstOrDefault()?.ImageUrl;
         book.UpdatedAtUtc = DateTime.UtcNow;
+        store.Save();
         return book;
     }
 
@@ -80,6 +100,7 @@ public class MenuBookService(DemoStore store, IWebHostEnvironment environment) :
         var book = GetById(id);
         if (book is null) return;
         store.Books.Remove(book);
+        store.Save();
     }
 
     public void DeletePage(Guid bookId, Guid pageId)
@@ -94,9 +115,25 @@ public class MenuBookService(DemoStore store, IWebHostEnvironment environment) :
         }).ToList();
         book.CoverImageUrl = book.Pages.FirstOrDefault()?.ImageUrl;
         book.UpdatedAtUtc = DateTime.UtcNow;
+        store.Save();
     }
 
     public IReadOnlyList<ThemePreset> GetThemes() => store.Themes;
+
+    public MenuPage? GetPage(Guid bookId, Guid pageId)
+    {
+        var book = GetById(bookId);
+        return book?.Pages.FirstOrDefault(x => x.Id == pageId);
+    }
+
+    public MenuPage? GetPage(string slug, Guid pageId)
+    {
+        var book = GetBySlugNoTracking(slug);
+        return book?.Pages.FirstOrDefault(x => x.Id == pageId);
+    }
+
+    private MenuBook? GetBySlugNoTracking(string slug)
+        => store.Books.FirstOrDefault(x => x.Slug.Equals(slug, StringComparison.OrdinalIgnoreCase));
 
     private void ValidateCreate(CreateMenuBookRequest request)
     {
@@ -129,26 +166,43 @@ public class MenuBookService(DemoStore store, IWebHostEnvironment environment) :
         {
             if (string.IsNullOrWhiteSpace(page.ImageBase64)) continue;
             var order = startOrder + page.Order;
-            var relativePath = SaveImage(folder, slug, order, page.ImageBase64);
-            result.Add(new MenuPage
+            var (mimeType, rawBase64, bytes) = ParseImage(page.ImageBase64);
+            var pageEntity = new MenuPage
             {
                 Title = string.IsNullOrWhiteSpace(page.Title) ? $"Page {order}" : page.Title,
                 Order = order,
-                ImageUrl = relativePath
-            });
+                ImageMimeType = mimeType,
+                ImageData = rawBase64
+            };
+            SaveImageFile(folder, slug, order, bytes);
+            pageEntity.ImageUrl = $"/api/menubooks/{slug}/pages/{pageEntity.Id}/image";
+            result.Add(pageEntity);
         }
 
         return result;
     }
 
-    private static string SaveImage(string folder, string slug, int order, string imageBase64)
+    private static (string mimeType, string rawBase64, byte[] bytes) ParseImage(string imageBase64)
     {
-        var commaIndex = imageBase64.IndexOf(',');
-        var rawBase64 = commaIndex >= 0 ? imageBase64[(commaIndex + 1)..] : imageBase64;
+        var mimeType = "image/jpeg";
+        var rawBase64 = imageBase64;
+        if (imageBase64.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+        {
+            var parts = imageBase64.Split(',', 2);
+            var header = parts[0];
+            rawBase64 = parts.Length > 1 ? parts[1] : string.Empty;
+            var mimeSegment = header[5..].Split(';', 2)[0];
+            if (!string.IsNullOrWhiteSpace(mimeSegment)) mimeType = mimeSegment;
+        }
+
         var bytes = Convert.FromBase64String(rawBase64);
+        return (mimeType, rawBase64, bytes);
+    }
+
+    private static void SaveImageFile(string folder, string slug, int order, byte[] bytes)
+    {
         var fileName = $"{slug}-page-{order:D3}.jpg";
         var filePath = Path.Combine(folder, fileName);
         File.WriteAllBytes(filePath, bytes);
-        return $"/uploads/menubooks/{slug}/{fileName}";
     }
 }
