@@ -1,7 +1,14 @@
 using MenuSaaS.Api.Data;
 using MenuSaaS.Api.Services;
+using Microsoft.AspNetCore.Http.Features;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// 🔥 رفع الحد الأقصى للملفات (مثلاً 100MB)
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = 104857600; // 100MB
+});
 
 // Services
 builder.Services.AddControllers();
@@ -22,11 +29,11 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Ensure upload directories exist
+// إنشاء فولدر الرفع
 var webRoot = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
 Directory.CreateDirectory(Path.Combine(webRoot, "uploads", "menubooks"));
 
-// Middleware
+// Middlewares
 app.UseSwagger();
 app.UseSwaggerUI();
 
