@@ -1,4 +1,0 @@
-{
-  "buildCommand": "node ./node_modules/nuxt/bin/nuxt.mjs build",
-  "framework": "nuxtjs"
-}
